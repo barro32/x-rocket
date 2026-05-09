@@ -4,6 +4,7 @@ export type LessonId =
   | 'improveFuelFlow'
   | 'salvageUsefulParts'
   | 'stabilizeFins'
+  | 'fairNoseCone'
   | 'cutDeadWeight'
   | 'standardizeAssembly'
   | 'recruitSpecialist'

@@ -57,19 +57,26 @@ describe('rocket simulation', () => {
     expect(availableLessons(state)).toEqual(['tuneEngineMix']);
   });
 
-  it('meta upgrades unlock new cards and permanent stat boosts', () => {
+  it('meta upgrades unlock new cards and upgrade card strength', () => {
     const state = { ...createInitialState(1), knowledge: 10 };
     const blocked = buyMetaUpgrade(state, 'basicStabilizers');
     const withRoot = buyMetaUpgrade(state, 'blackBoxRecovery');
     const next = buyMetaUpgrade(withRoot, 'basicStabilizers');
+    const guidanceProgram = {
+      ...next,
+      metaUpgrades: { ...next.metaUpgrades, guidanceProgram: 2 },
+    };
+    const baseFins = applyLessonToRocketStats(next.rocketStats, 'stabilizeFins', next.metaUpgrades);
+    const upgradedFins = applyLessonToRocketStats(guidanceProgram.rocketStats, 'stabilizeFins', guidanceProgram.metaUpgrades);
 
     expect(blocked.metaUpgrades.basicStabilizers).toBe(0);
     expect(isMetaUpgradeUnlocked(state.metaUpgrades, 'blackBoxRecovery')).toBe(true);
     expect(isMetaUpgradeUnlocked(state.metaUpgrades, 'basicStabilizers')).toBe(false);
     expect(withRoot.metaUpgrades.blackBoxRecovery).toBe(1);
     expect(next.metaUpgrades.basicStabilizers).toBe(1);
-    expect(next.rocketStats.guidance).toBeGreaterThan(withRoot.rocketStats.guidance);
+    expect(next.rocketStats.guidance).toBe(withRoot.rocketStats.guidance);
     expect(availableLessons(next)).toContain('stabilizeFins');
+    expect(upgradedFins.guidance - guidanceProgram.rocketStats.guidance).toBeGreaterThan(baseFins.guidance - next.rocketStats.guidance);
   });
 
   it('meta upgrade costs scale for multi-level nodes', () => {
@@ -173,7 +180,18 @@ describe('rocket simulation', () => {
     expect(launchCost(state)).toBeLessThan(launchCost(createInitialState(1)));
   });
 
-  it('prototype archive grants startup lesson drafts', () => {
+  it('advanced aerodynamics unlocks a direct aerodynamics card', () => {
+    const state = createInitialState(1, {
+      ...defaultMetaUpgrades,
+      blackBoxRecovery: 1,
+      basicStabilizers: 1,
+      advancedAerodynamics: 1,
+    });
+
+    expect(availableLessons(state)).toContain('fairNoseCone');
+  });
+
+  it('prototype archive grants startup lesson stacks instead of draft choices', () => {
     const state = createInitialState(1, {
       ...defaultMetaUpgrades,
       blackBoxRecovery: 1,
@@ -181,22 +199,26 @@ describe('rocket simulation', () => {
       prototypeArchive: 2,
     });
 
-    expect(state.pendingLessonChoices).toHaveLength(2);
-    expect(state.pendingLessonChoices.every((id) => availableLessons(state).includes(id))).toBe(true);
+    expect(state.pendingLessonChoices).toHaveLength(0);
+    expect(state.lessons.tuneEngineMix).toBe(2);
+    expect(state.rocketStats.thrust).toBeGreaterThan(createInitialState(1).rocketStats.thrust);
   });
 
-  it('mission control increases post-launch draft size', () => {
+  it('mission control steers failed launch drafts toward the failed stat', () => {
     const state = createInitialState(1, {
       ...defaultMetaUpgrades,
       blackBoxRecovery: 1,
       basicStabilizers: 1,
-      guidanceProgram: 1,
       failureReviewBoard: 1,
-      missionControl: 2,
+      prototypeArchive: 1,
+      missionControl: 1,
+      advancedAerodynamics: 1,
     });
-    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0, 0.99, 0.99]));
 
-    expect(next.pendingLessonChoices).toHaveLength(5);
+    expect(next.lastLaunch?.failedStat).toBe('aerodynamics');
+    expect(next.pendingLessonChoices).toContain('fairNoseCone');
+    expect(next.pendingLessonChoices).toHaveLength(3);
   });
 
   it('safety review board vetoes one catastrophic explosion per company', () => {
@@ -220,6 +242,7 @@ describe('rocket simulation', () => {
       scrapyardEngineering: 1,
       basicStabilizers: 1,
       guidanceProgram: 1,
+      advancedAerodynamics: 1,
       failureReviewBoard: 1,
     }).rocketStats;
 

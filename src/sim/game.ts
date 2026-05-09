@@ -20,6 +20,7 @@ const baseLaunchCost = 50;
 
 export function createInitialState(seed = Date.now(), metaUpgrades = defaultMetaUpgrades): GameState {
   const normalizedMetaUpgrades = { ...defaultMetaUpgrades, ...metaUpgrades };
+  const initialLessons = startingLessonsFor(normalizedMetaUpgrades);
   return {
     version: 2,
     money: startingMoneyFor(normalizedMetaUpgrades),
@@ -31,9 +32,9 @@ export function createInitialState(seed = Date.now(), metaUpgrades = defaultMeta
     bankruptcies: 0,
     bankruptcyRewardClaimed: false,
     highestAltitudeMeters: 0,
-    lessons: { ...defaultLessons },
-    pendingLessonChoices: draftStartupLessonChoices(normalizedMetaUpgrades, seed),
-    rocketStats: rebuildRocketStats(normalizedMetaUpgrades, defaultLessons),
+    lessons: initialLessons,
+    pendingLessonChoices: [],
+    rocketStats: rebuildRocketStats(normalizedMetaUpgrades, initialLessons),
     unlockedLayers: {
       ground: true,
       orbit: false,
@@ -60,7 +61,8 @@ export function buyMetaUpgrade(state: GameState, id: MetaUpgradeId): GameState {
 }
 
 export function launchCost(state: GameState): number {
-  const assemblyDiscount = Math.min(0.64, state.lessons.standardizeAssembly * 0.08);
+  const assemblyDiscountPerStack = 0.05 + (state.metaUpgrades.supplierContracts > 0 ? 0.01 : 0);
+  const assemblyDiscount = Math.min(0.48, state.lessons.standardizeAssembly * assemblyDiscountPerStack);
   const contractDiscount = Math.min(0.34, state.metaUpgrades.supplierContracts * 0.06);
   return Math.max(6, Math.floor(baseLaunchCost * (1 - assemblyDiscount - contractDiscount)));
 }
@@ -125,6 +127,13 @@ function startingMoneyFor(metaUpgrades: Record<MetaUpgradeId, number>): number {
 
 function restartMoneyFor(metaUpgrades: Record<MetaUpgradeId, number>): number {
   return restartLoan + metaUpgrades.questionableInvestors * 180;
+}
+
+function startingLessonsFor(metaUpgrades: Record<MetaUpgradeId, number>): Record<LessonId, number> {
+  return {
+    ...defaultLessons,
+    tuneEngineMix: Math.min(2, metaUpgrades.prototypeArchive),
+  };
 }
 
 function calculateSalvage(
@@ -205,7 +214,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     highestAltitudeMeters,
     safetyReviewUses,
     lastLaunch: result,
-    pendingLessonChoices: draftLessonChoices(state, rng, outcome),
+    pendingLessonChoices: draftLessonChoices(state, rng, outcome, effectiveFailure?.stat),
     unlockedLayers: {
       ...state.unlockedLayers,
       orbit: state.unlockedLayers.orbit || outcome === 'orbit',
@@ -266,26 +275,28 @@ function launchMessage(
   return `Flight topped out at ${altitudeM} m. Iterate and launch again.`;
 }
 
-function draftStartupLessonChoices(metaUpgrades: Record<MetaUpgradeId, number>, seed: number): LessonId[] {
-  const count = Math.min(3, metaUpgrades.prototypeArchive);
-  if (count <= 0) {
-    return [];
-  }
-
-  const state = createSyntheticState(seed, metaUpgrades, defaultLessons);
-  return draftChoices(state, new Mulberry32(seed ^ 0x7f4a7c15), Math.min(count, availableLessons(state).length));
-}
-
-function draftLessonChoices(state: GameState, rng: Rng, outcome: LaunchResult['outcome']): LessonId[] {
-  const countBonus = state.metaUpgrades.missionControl + (outcome !== 'orbit' ? state.metaUpgrades.crashLab : 0);
-  const baseCount = 3 + countBonus + (state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 2 === 0 ? 1 : 0);
+function draftLessonChoices(
+  state: GameState,
+  rng: Rng,
+  outcome: LaunchResult['outcome'],
+  failedStat?: RocketStatId,
+): LessonId[] {
+  const baseCount = 3 + (state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 2 === 0 ? 1 : 0);
   const targetCount = Math.min(Math.max(3, baseCount), availableLessons(state).length);
-  return draftChoices(state, rng, targetCount);
+  const guaranteedLesson = state.metaUpgrades.missionControl > 0 && outcome !== 'orbit' && failedStat
+    ? lessonForFailedStat(failedStat)
+    : undefined;
+  return draftChoices(state, rng, targetCount, guaranteedLesson);
 }
 
-function draftChoices(state: GameState, rng: Rng, targetCount: number): LessonId[] {
+function draftChoices(state: GameState, rng: Rng, targetCount: number, guaranteedLesson?: LessonId): LessonId[] {
   const pool = availableLessons(state);
   const choices: LessonId[] = [];
+
+  if (guaranteedLesson && pool.includes(guaranteedLesson)) {
+    choices.push(guaranteedLesson);
+    pool.splice(pool.indexOf(guaranteedLesson), 1);
+  }
 
   while (choices.length < targetCount) {
     const index = clamp(Math.floor(rng.next() * pool.length), 0, pool.length - 1);
@@ -296,35 +307,21 @@ function draftChoices(state: GameState, rng: Rng, targetCount: number): LessonId
   return choices;
 }
 
-function createSyntheticState(
-  seed: number,
-  metaUpgrades: Record<MetaUpgradeId, number>,
-  lessons: Record<LessonId, number>,
-): GameState {
-  return {
-    version: 2,
-    money: 0,
-    knowledge: 0,
-    metaUpgrades: { ...defaultMetaUpgrades, ...metaUpgrades },
-    safetyReviewUses: 0,
-    companyIndex: 0,
-    launches: 0,
-    bankruptcies: 0,
-    bankruptcyRewardClaimed: false,
-    highestAltitudeMeters: 0,
-    lessons: { ...defaultLessons, ...lessons },
-    pendingLessonChoices: [],
-    rocketStats: rebuildRocketStats(metaUpgrades, lessons),
-    unlockedLayers: {
-      ground: true,
-      orbit: false,
-      station: false,
-      moon: false,
-      mars: false,
-      solar: false,
-    },
-    seed,
-  };
+function lessonForFailedStat(statId: RocketStatId): LessonId | undefined {
+  switch (statId) {
+    case 'thrust':
+      return 'tuneEngineMix';
+    case 'fuel':
+      return 'improveFuelFlow';
+    case 'aerodynamics':
+      return 'fairNoseCone';
+    case 'lightness':
+      return 'cutDeadWeight';
+    case 'guidance':
+      return 'stabilizeFins';
+    case 'reliability':
+      return 'reinforceFrame';
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -370,7 +367,8 @@ function failureAltitudeFactor(statId: PerformanceStatId): number {
 }
 
 function salvageRateFor(state: GameState): number {
-  let salvageRate = state.lessons.salvageUsefulParts * 0.1;
+  const salvageLessonRate = 0.07 + (state.metaUpgrades.recoveryProgram > 0 ? 0.03 : 0);
+  let salvageRate = state.lessons.salvageUsefulParts * salvageLessonRate;
   if (state.metaUpgrades.scrapyardEngineering > 0) {
     salvageRate += 0.08;
   }

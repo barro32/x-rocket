@@ -24,19 +24,19 @@ interface Bounds {
 }
 
 const nodePositions: Record<MetaUpgradeId, { x: number; y: number }> = {
-  blackBoxRecovery: { x: 0, y: -55 },
-  scrapyardEngineering: { x: -260, y: 20 },
-  questionableInvestors: { x: 0, y: 140 },
-  basicStabilizers: { x: 260, y: 20 },
-  recoveryProgram: { x: -390, y: 160 },
-  supplierContracts: { x: -250, y: 210 },
-  failureReviewBoard: { x: 0, y: 265 },
-  prototypeArchive: { x: 0, y: 370 },
-  safetyReviewBoard: { x: 170, y: 210 },
-  missionControl: { x: 0, y: 470 },
-  crashLab: { x: 170, y: 340 },
-  guidanceProgram: { x: 255, y: 190 },
-  advancedAerodynamics: { x: 390, y: 160 },
+  blackBoxRecovery: { x: 0, y: 0 },
+  scrapyardEngineering: { x: -230, y: 0 },
+  recoveryProgram: { x: -455, y: -85 },
+  supplierContracts: { x: -455, y: 85 },
+  basicStabilizers: { x: 230, y: 0 },
+  guidanceProgram: { x: 455, y: -85 },
+  advancedAerodynamics: { x: 455, y: 85 },
+  questionableInvestors: { x: 0, y: 165 },
+  failureReviewBoard: { x: 0, y: 320 },
+  prototypeArchive: { x: -170, y: 475 },
+  safetyReviewBoard: { x: 170, y: 475 },
+  missionControl: { x: -170, y: 620 },
+  crashLab: { x: 170, y: 620 },
 };
 
 export class MetaProgressView {
@@ -69,8 +69,8 @@ export class MetaProgressView {
   private panStartOffsetX = 0;
   private panStartOffsetY = 0;
   private panOffsetX = 0;
-  private panOffsetY = -75;
-  private treeZoom = 0.9;
+  private panOffsetY = -160;
+  private treeZoom = 0.72;
 
   constructor(
     private readonly scene: Phaser.Scene,

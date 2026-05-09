@@ -22,19 +22,6 @@ export function createBaseRocketStats(metaUpgrades?: Record<MetaUpgradeId, numbe
     return stats;
   }
 
-  if (metaUpgrades.basicStabilizers > 0) {
-    stats.guidance = clampRocketStat(stats.guidance + 6);
-  }
-
-  if (metaUpgrades.guidanceProgram > 0) {
-    stats.guidance = clampRocketStat(stats.guidance + 10);
-    stats.reliability = clampRocketStat(stats.reliability + 4);
-  }
-
-  if (metaUpgrades.advancedAerodynamics > 0) {
-    stats.aerodynamics = clampRocketStat(stats.aerodynamics + 12);
-  }
-
   return stats;
 }
 
