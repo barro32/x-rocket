@@ -63,6 +63,7 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 - Rocket rolls from hangar to pad, launches upward, and the camera follows.
 - Launch summary and cards are camera-fixed overlays.
 - Meta upgrades are displayed as an authored compass graph: root centered, economy west, flight east, and review/knowledge south.
+- Meta graph text renders at higher text resolution and opens at 1:1 zoom to avoid blurry scaled labels.
 - Dev stats toggle with `D`.
 - Global menu includes reset game.
 

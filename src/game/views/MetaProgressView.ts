@@ -25,18 +25,18 @@ interface Bounds {
 
 const nodePositions: Record<MetaUpgradeId, { x: number; y: number }> = {
   blackBoxRecovery: { x: 0, y: 0 },
-  scrapyardEngineering: { x: -230, y: 0 },
-  recoveryProgram: { x: -455, y: -85 },
-  supplierContracts: { x: -455, y: 85 },
-  basicStabilizers: { x: 230, y: 0 },
-  guidanceProgram: { x: 455, y: -85 },
-  advancedAerodynamics: { x: 455, y: 85 },
-  questionableInvestors: { x: 0, y: 165 },
-  failureReviewBoard: { x: 0, y: 320 },
-  prototypeArchive: { x: -170, y: 475 },
-  safetyReviewBoard: { x: 170, y: 475 },
-  missionControl: { x: -170, y: 620 },
-  crashLab: { x: 170, y: 620 },
+  scrapyardEngineering: { x: -205, y: 0 },
+  recoveryProgram: { x: -400, y: -80 },
+  supplierContracts: { x: -400, y: 80 },
+  basicStabilizers: { x: 205, y: 0 },
+  guidanceProgram: { x: 400, y: -80 },
+  advancedAerodynamics: { x: 400, y: 80 },
+  questionableInvestors: { x: 0, y: 150 },
+  failureReviewBoard: { x: 0, y: 290 },
+  prototypeArchive: { x: -165, y: 430 },
+  safetyReviewBoard: { x: 165, y: 430 },
+  missionControl: { x: -165, y: 560 },
+  crashLab: { x: 165, y: 560 },
 };
 
 export class MetaProgressView {
@@ -69,8 +69,8 @@ export class MetaProgressView {
   private panStartOffsetX = 0;
   private panStartOffsetY = 0;
   private panOffsetX = 0;
-  private panOffsetY = -160;
-  private treeZoom = 0.72;
+  private panOffsetY = -115;
+  private treeZoom = 1;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -91,12 +91,14 @@ export class MetaProgressView {
       fontSize: '32px',
       color: '#f6e7c7',
     });
+    title.setResolution(2);
 
     this.knowledgeText = scene.add.text(-470, -254, '', {
       fontFamily: 'monospace',
       fontSize: '19px',
       color: '#8ef6c5',
     });
+    this.knowledgeText.setResolution(2);
 
     this.navHintText = scene.add.text(468, -254, 'Drag to pan | Wheel to zoom', {
       fontFamily: 'monospace',
@@ -104,6 +106,7 @@ export class MetaProgressView {
       color: '#aab2c5',
     });
     this.navHintText.setOrigin(1, 0);
+    this.navHintText.setResolution(2);
 
     const viewportBackground = scene.add.rectangle(
       MetaProgressView.viewportCenterX,
@@ -150,6 +153,7 @@ export class MetaProgressView {
         wordWrap: { width: 92 },
       });
       label.setOrigin(0.5);
+      label.setResolution(2);
       label.setInteractive({ useHandCursor: true });
       label.on('pointerup', (pointer: Phaser.Input.Pointer) => this.handleNodePointerUp(spec.id, pointer));
       label.on('pointerover', (pointer: Phaser.Input.Pointer) => this.showTooltip(spec.id, pointer));
@@ -168,6 +172,7 @@ export class MetaProgressView {
       padding: { x: 22, y: 10 },
     });
     this.continueButton.setOrigin(0.5);
+    this.continueButton.setResolution(2);
     this.continueButton.setInteractive({ useHandCursor: true });
     this.continueButton.on('pointerdown', () => this.config.onContinue());
     this.continueButton.on('pointerover', () => this.continueButton.setScale(1.05));
@@ -184,6 +189,7 @@ export class MetaProgressView {
       wordWrap: { width: 240 },
       lineSpacing: 3,
     });
+    this.tooltipText.setResolution(2);
     this.tooltipContainer = scene.add.container(0, 0, [this.tooltipBackground, this.tooltipText]);
     this.tooltipContainer.setVisible(false);
     this.container.add(this.tooltipContainer);
