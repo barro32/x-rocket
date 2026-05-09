@@ -1,14 +1,15 @@
 import Phaser from 'phaser';
-import { buyMetaUpgrade, chooseLesson, isBankrupt, launchCost, restartCompany, simulateLaunch } from '../sim/game';
+import { buyMetaUpgrade, claimBankruptcyReward, chooseLesson, createInitialState, isBankrupt, launchCost, restartCompany, simulateLaunch } from '../sim/game';
 import { lessonById } from '../sim/lessons';
-import { loadGame, saveGame } from '../sim/save';
+import { clearSave, loadGame, saveGame } from '../sim/save';
 import type { GameState } from '../sim/types';
 import { DevStatsView } from './views/DevStatsView';
 import { EffectsView } from './views/EffectsView';
+import { GlobalMenuView } from './views/GlobalMenuView';
 import { HudView } from './views/HudView';
 import { LaunchSummaryView } from './views/LaunchSummaryView';
 import { LessonCardView } from './views/LessonCardView';
-import { MetaDevView } from './views/MetaDevView';
+import { MetaProgressView } from './views/MetaProgressView';
 import { RocketView } from './views/RocketView';
 import { WorldView } from './views/WorldView';
 
@@ -17,8 +18,9 @@ export class GameScene extends Phaser.Scene {
   private world!: WorldView;
   private rocket!: RocketView;
   private hud!: HudView;
+  private globalMenu!: GlobalMenuView;
   private devStats!: DevStatsView;
-  private metaDev!: MetaDevView;
+  private metaProgress!: MetaProgressView;
   private effects!: EffectsView;
   private activeCards: LessonCardView[] = [];
   private launchSummary?: LaunchSummaryView;
@@ -33,11 +35,21 @@ export class GameScene extends Phaser.Scene {
     this.world = new WorldView(this);
     this.rocket = new RocketView(this, this.world.hangarDoor, this.world.launchPad);
     this.effects = new EffectsView(this);
-    this.hud = new HudView(this, { onPrimary: () => void this.primaryAction() });
+    this.globalMenu = new GlobalMenuView(this, { onReset: () => this.resetGame() });
+    this.hud = new HudView(this, {
+      onPrimary: () => void this.primaryAction(),
+      onMenu: () => this.globalMenu.show(),
+    });
     this.devStats = new DevStatsView(this);
-    this.metaDev = new MetaDevView(this, { onBuy: (id) => this.buyMeta(id) });
+    this.metaProgress = new MetaProgressView(this, {
+      onBuy: (id) => this.buyMeta(id),
+      onContinue: () => this.startNextCompany(),
+    });
 
     this.rocket.resetToHangar();
+    this.cameras.main.setBounds(0, -3200, 1280, 3920);
+    this.resetCamera();
+    this.input.keyboard?.on('keydown-D', () => this.devStats.toggle());
     this.renderState();
 
     if (this.state.pendingLessonChoices.length > 0) {
@@ -51,10 +63,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (isBankrupt(this.state)) {
-      this.state = restartCompany(this.state);
-      this.rocket.resetToHangar();
+      this.state = claimBankruptcyReward(this.state);
       this.persistAndRender();
-      this.effects.floatingText('+1 knowledge', 640, 170, '#8ef6c5');
+      this.metaProgress.show(this.state);
       return;
     }
 
@@ -84,8 +95,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.cameras.main.startFollow(this.rocket.sprite, true, 0.08, 0.12, 0, 130);
     const finalPosition = await this.rocket.flyTo(result.altitudeMeters);
-    this.effects.floatingText(`${Math.floor(result.altitudeMeters / 1000)} km`, finalPosition.x, finalPosition.y - 40);
+    this.cameras.main.stopFollow();
+    this.effects.floatingText(`${Math.floor(result.altitudeMeters)} m`, finalPosition.x, finalPosition.y - 40);
 
     let cardOrigin = finalPosition;
     if (result.outcome === 'exploded') {
@@ -97,7 +110,7 @@ export class GameScene extends Phaser.Scene {
 
     this.persistAndRender();
     await wait(this, 360);
-    await this.showLessonCards(cardOrigin);
+    await this.showLessonCards(this.worldToScreen(cardOrigin));
     this.busy = false;
     this.renderState();
   }
@@ -156,6 +169,7 @@ export class GameScene extends Phaser.Scene {
     this.launchSummary = undefined;
     this.state = chooseLesson(this.state, lessonId);
     this.rocket.resetToHangar();
+    this.resetCamera();
     this.persistAndRender();
     this.effects.floatingText(lessonById[lessonId].name, 640, 190, '#f6e7c7');
     this.busy = false;
@@ -175,12 +189,48 @@ export class GameScene extends Phaser.Scene {
     this.state = next;
     this.rocket.resetToHangar();
     this.persistAndRender();
+    this.metaProgress.update(this.state);
     this.effects.floatingText('Meta unlocked', 640, 190, '#8ef6c5');
+  }
+
+  private startNextCompany(): void {
+    if (!isBankrupt(this.state)) {
+      this.metaProgress.hide();
+      return;
+    }
+
+    this.state = restartCompany(this.state);
+    this.rocket.resetToHangar();
+    this.resetCamera();
+    this.persistAndRender();
+    this.metaProgress.hide();
+    this.effects.floatingText('+1 knowledge', 640, 170, '#8ef6c5');
+  }
+
+  private resetGame(): void {
+    clearSave();
+    this.destroyCards();
+    this.state = createInitialState();
+    this.rocket.resetToHangar();
+    this.resetCamera();
+    this.metaProgress.hide();
+    this.globalMenu.hide();
+    this.persistAndRender();
   }
 
   private persistAndRender(): void {
     saveGame(this.state);
     this.renderState();
+  }
+
+  private resetCamera(): void {
+    this.cameras.main.stopFollow();
+    this.cameras.main.pan(640, 360, 220, 'Sine.easeOut');
+  }
+
+  private worldToScreen(point: Phaser.Math.Vector2): Phaser.Math.Vector2 {
+    const camera = this.cameras.main;
+    return new Phaser.Math.Vector2(point.x - camera.scrollX, point.y - camera.scrollY);
   }
 
   private renderState(): void {
@@ -192,7 +242,7 @@ export class GameScene extends Phaser.Scene {
       this.busy || this.state.pendingLessonChoices.length > 0,
     );
     this.devStats.update(this.state);
-    this.metaDev.update(this.state);
+    this.metaProgress.update(this.state);
   }
 
   private destroyCards(): void {

@@ -4,6 +4,7 @@ import type { GameState } from '../../sim/types';
 
 export class DevStatsView {
   private readonly text: Phaser.GameObjects.Text;
+  private visible = false;
 
   constructor(scene: Phaser.Scene) {
     this.text = scene.add.text(1252, 24, '', {
@@ -15,10 +16,21 @@ export class DevStatsView {
       align: 'right',
     });
     this.text.setOrigin(1, 0);
+    this.text.setScrollFactor(0);
     this.text.setDepth(30);
+    this.text.setVisible(false);
+  }
+
+  toggle(): void {
+    this.visible = !this.visible;
+    this.text.setVisible(this.visible);
   }
 
   update(state: GameState): void {
+    if (!this.visible) {
+      return;
+    }
+
     const stats = deriveRocketStats(state.parts);
     this.text.setText(
       [

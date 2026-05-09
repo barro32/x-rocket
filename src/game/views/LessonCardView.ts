@@ -20,6 +20,7 @@ export class LessonCardView {
   ) {
     this.container = scene.add.container(config.origin.x, config.origin.y);
     this.container.setDepth(20);
+    this.container.setScrollFactor(0);
 
     const shadow = scene.add.rectangle(8, 10, 250, 172, 0x050711, 0.55);
     this.panel = scene.add.rectangle(0, 0, 250, 172, 0xf6e7c7, 1);

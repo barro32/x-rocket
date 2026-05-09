@@ -26,11 +26,11 @@ export class WorldView {
     const graphics = this.scene.add.graphics();
 
     graphics.fillGradientStyle(0x0b1024, 0x0b1024, 0x273f61, 0x273f61, 1);
-    graphics.fillRect(0, 0, 1280, 720);
+    graphics.fillRect(0, -3200, 1280, 3920);
 
-    for (let i = 0; i < 120; i += 1) {
+    for (let i = 0; i < 360; i += 1) {
       const x = (i * 83) % 1270;
-      const y = 18 + ((i * 47) % 310);
+      const y = -3150 + ((i * 47) % 3460);
       graphics.fillStyle(0xf6e7c7, 0.25 + ((i % 5) * 0.1));
       graphics.fillRect(x, y, i % 11 === 0 ? 3 : 2, 2);
     }

@@ -44,11 +44,12 @@ export class RocketView {
   }
 
   async flyTo(altitudeMeters: number): Promise<Phaser.Math.Vector2> {
-    const targetY = Math.max(72, this.launchPad.y - Math.min(430, altitudeMeters / 170));
+    const visualRise = altitudeToPixels(altitudeMeters);
+    const targetY = this.launchPad.y - visualRise;
     await tween(this.scene, {
       targets: this.sprite,
       y: targetY,
-      duration: 780,
+      duration: Phaser.Math.Clamp(620 + visualRise * 1.4, 760, 2400),
       ease: 'Cubic.easeOut',
     });
     return new Phaser.Math.Vector2(this.sprite.x, this.sprite.y);
@@ -67,6 +68,14 @@ export class RocketView {
       ease: 'Sine.easeOut',
     });
   }
+}
+
+function altitudeToPixels(altitudeMeters: number): number {
+  if (altitudeMeters <= 100) {
+    return altitudeMeters * 0.45;
+  }
+
+  return 45 + Math.log10(altitudeMeters / 100 + 1) * 520;
 }
 
 function tween(scene: Phaser.Scene, config: Phaser.Types.Tweens.TweenBuilderConfig): Promise<void> {

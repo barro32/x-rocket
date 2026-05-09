@@ -5,8 +5,9 @@ import { createBaseParts, deriveRocketStats } from './parts';
 import type { FailurePhase, GameState, LaunchResult, RocketPartId, LessonId, MetaUpgradeId } from './types';
 
 const orbitAltitudeMeters = 100_000;
-const startingMoney = 120;
+const startingMoney = 100;
 const restartLoan = 100;
+const baseLaunchCost = 50;
 
 export function createInitialState(seed = Date.now(), metaUpgrades = defaultMetaUpgrades): GameState {
   return {
@@ -17,6 +18,7 @@ export function createInitialState(seed = Date.now(), metaUpgrades = defaultMeta
     companyIndex: 23,
     launches: 0,
     bankruptcies: 0,
+    bankruptcyRewardClaimed: false,
     highestAltitudeMeters: 0,
     lessons: { ...defaultLessons },
     pendingLessonChoices: [],
@@ -47,9 +49,8 @@ export function buyMetaUpgrade(state: GameState, id: MetaUpgradeId): GameState {
 }
 
 export function launchCost(state: GameState): number {
-  const stats = deriveRocketStats(state.parts);
   const assemblyDiscount = Math.min(0.64, state.lessons.standardizeAssembly * 0.08);
-  return Math.max(6, Math.floor(stats.cost * (1 - assemblyDiscount)));
+  return Math.max(6, Math.floor(baseLaunchCost * (1 - assemblyDiscount)));
 }
 
 export function isBankrupt(state: GameState): boolean {
@@ -73,16 +74,32 @@ export function chooseLesson(state: GameState, id: LessonId): GameState {
 }
 
 export function restartCompany(state: GameState): GameState {
-  const metaKnowledgeGained = 1 + state.lessons.documentEverything + state.metaUpgrades.failureReviewBoard;
+  const claimedState = claimBankruptcyReward(state);
 
   return {
-    ...createInitialState(state.seed + 1, state.metaUpgrades),
-    money: restartMoneyFor(state.metaUpgrades),
-    knowledge: state.knowledge + metaKnowledgeGained,
-    companyIndex: state.companyIndex + 1,
-    bankruptcies: state.bankruptcies + 1,
-    highestAltitudeMeters: state.highestAltitudeMeters,
-    unlockedLayers: { ...state.unlockedLayers },
+    ...createInitialState(claimedState.seed + 1, claimedState.metaUpgrades),
+    money: restartMoneyFor(claimedState.metaUpgrades),
+    knowledge: claimedState.knowledge,
+    companyIndex: claimedState.companyIndex + 1,
+    bankruptcies: claimedState.bankruptcies + 1,
+    highestAltitudeMeters: claimedState.highestAltitudeMeters,
+    unlockedLayers: { ...claimedState.unlockedLayers },
+  };
+}
+
+export function bankruptcyReward(state: GameState): number {
+  return state.lessons.documentEverything + state.metaUpgrades.failureReviewBoard;
+}
+
+export function claimBankruptcyReward(state: GameState): GameState {
+  if (!isBankrupt(state) || state.bankruptcyRewardClaimed) {
+    return state;
+  }
+
+  return {
+    ...state,
+    knowledge: state.knowledge + bankruptcyReward(state),
+    bankruptcyRewardClaimed: true,
   };
 }
 
@@ -92,6 +109,23 @@ function startingMoneyFor(metaUpgrades: Record<MetaUpgradeId, number>): number {
 
 function restartMoneyFor(metaUpgrades: Record<MetaUpgradeId, number>): number {
   return restartLoan + metaUpgrades.questionableInvestors * 180;
+}
+
+function calculateSalvage(
+  cost: number,
+  salvageRate: number,
+  outcome: LaunchResult['outcome'],
+  scrapyardLevel: number,
+): number {
+  if (outcome === 'exploded') {
+    return Math.floor(cost * (salvageRate + scrapyardLevel * 0.08));
+  }
+
+  if (outcome === 'failed') {
+    return Math.floor(cost * salvageRate * 0.5);
+  }
+
+  return 0;
 }
 
 export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state.seed + state.launches)): GameState {
@@ -115,7 +149,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
   const volatilityRange = Math.max(0.34, 0.98 - stats.stability * 0.32);
   const volatility = volatilityFloor + rng.next() * volatilityRange;
   const flightScore = stats.thrustToWeight * stats.burnTime * (0.72 + stats.aerodynamics) * (0.7 + stats.stability);
-  const nominalAltitudeMeters = Math.floor(14_000 * flightScore * volatility);
+  const nominalAltitudeMeters = Math.floor(280 * flightScore * volatility);
   const altitudeMeters = failure
     ? Math.floor(nominalAltitudeMeters * failure.altitudeFactor)
     : nominalAltitudeMeters;
@@ -129,7 +163,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
   }
 
   const contractPayout = outcome === 'orbit' ? 220 : 0;
-  const salvage = outcome === 'exploded' ? Math.floor(cost * stats.salvageRate) : 0;
+  const salvage = calculateSalvage(cost, stats.salvageRate, outcome, state.metaUpgrades.scrapyardEngineering);
   const moneyDelta = contractPayout + salvage - cost;
   const highestAltitudeMeters = Math.max(state.highestAltitudeMeters, altitudeMeters);
 
@@ -146,6 +180,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
   return {
     ...state,
     money: state.money + moneyDelta,
+    knowledge: state.knowledge + 1,
     launches: state.launches + 1,
     highestAltitudeMeters,
     lastLaunch: result,
@@ -177,14 +212,14 @@ function rollFailure(stats: ReturnType<typeof deriveRocketStats>, rng: Rng): Fai
       phase: 'liftoff',
       part: 'launchMount',
       explodes: true,
-      altitudeFactor: 0.08,
+      altitudeFactor: 0.18,
       chance: 1 - clamp((stats.ignitionReliability + stats.stability) / 2, 0, 1),
     },
     {
       phase: 'ascent',
       part: 'body',
       explodes: true,
-      altitudeFactor: 0.42,
+      altitudeFactor: 0.55,
       chance: 1 - stats.structuralReliability,
     },
     {
@@ -217,7 +252,7 @@ function launchMessage(
   altitudeMeters: number,
   failure?: FailureResult,
 ): string {
-  const altitudeKm = Math.floor(altitudeMeters / 1_000);
+  const altitudeM = Math.floor(altitudeMeters);
 
   if (failure) {
     const partName = partLabel(failure.part);
@@ -225,20 +260,20 @@ function launchMessage(
       return `${partName} failed during ignition. The pad crew ducked.`;
     }
     if (failure.explodes) {
-      return `${partName} failed at ${altitudeKm} km. Vehicle destroyed.`;
+      return `${partName} failed at ${altitudeM} m. Vehicle destroyed.`;
     }
-    return `${partName} failed at ${altitudeKm} km. Flight ended early.`;
+    return `${partName} failed at ${altitudeM} m. Flight ended early.`;
   }
 
   if (outcome === 'orbit') {
-    return `Stable orbit reached at ${altitudeKm} km. Contracts unlocked.`;
+    return `Stable orbit reached at ${altitudeM} m. Contracts unlocked.`;
   }
 
   if (outcome === 'exploded') {
-    return `Vehicle exploded at ${altitudeKm} km. The engineers learned something.`;
+    return `Vehicle exploded at ${altitudeM} m. The engineers learned something.`;
   }
 
-  return `Flight topped out at ${altitudeKm} km. Iterate and launch again.`;
+  return `Flight topped out at ${altitudeM} m. Iterate and launch again.`;
 }
 
 function partLabel(part: RocketPartId): string {
@@ -265,10 +300,11 @@ function partLabel(part: RocketPartId): string {
 function draftLessonChoices(state: GameState, rng: Rng): LessonId[] {
   const pool = availableLessons(state);
   const choiceCount = state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 3 === 0 ? 4 : 3;
+  const targetCount = Math.min(choiceCount, pool.length);
   const choices: LessonId[] = [];
 
-  while (choices.length < Math.min(choiceCount, pool.length)) {
-    const index = Math.floor(rng.next() * pool.length);
+  while (choices.length < targetCount) {
+    const index = clamp(Math.floor(rng.next() * pool.length), 0, pool.length - 1);
     const [choice] = pool.splice(index, 1);
     choices.push(choice);
   }

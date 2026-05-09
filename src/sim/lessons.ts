@@ -8,6 +8,7 @@ export const lessonSpecs: LessonSpec[] = [
     description: 'Hull reliability up. Adds a little mass.',
     effect: 'Hull reliability +5.5% | Mass +0.6',
     maxStacks: 10,
+    unlock: 'failureReviewBoard',
   },
   {
     id: 'tuneEngineMix',
@@ -54,6 +55,7 @@ export const lessonSpecs: LessonSpec[] = [
     description: 'Launch mount reliability up. Build costs down.',
     effect: 'Mount reliability +3.5% | Mount cost -$0.35 | Body cost -$0.25',
     maxStacks: 8,
+    unlock: 'scrapyardEngineering',
   },
   {
     id: 'recruitSpecialist',

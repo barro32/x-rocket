@@ -50,6 +50,7 @@ export interface MetaUpgradeSpec {
   description: string;
   cost: number;
   maxLevel: number;
+  prerequisites?: MetaUpgradeId[];
   unlocks: string;
 }
 
@@ -64,6 +65,7 @@ export interface LaunchResult {
 }
 
 export interface PartStats {
+  unlocked: boolean;
   reliability: number;
   mass: number;
   cost: number;
@@ -102,6 +104,7 @@ export interface GameState {
   companyIndex: number;
   launches: number;
   bankruptcies: number;
+  bankruptcyRewardClaimed: boolean;
   highestAltitudeMeters: number;
   lastLaunch?: LaunchResult;
   lessons: Record<LessonId, number>;

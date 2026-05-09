@@ -4,7 +4,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
   {
     id: 'blackBoxRecovery',
     name: 'Black Box Recovery',
-    description: 'Explosions can teach useful failure-specific lessons.',
+    description: 'Recovered telemetry unlocks dangerous failure lessons.',
     cost: 1,
     maxLevel: 1,
     unlocks: 'Unlocks Improve Fuel Flow and Cut Dead Weight cards.',
@@ -12,10 +12,11 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
   {
     id: 'scrapyardEngineering',
     name: 'Scrapyard Engineering',
-    description: 'Stop throwing everything away. Bolt suspicious junk back on.',
+    description: 'Salvage crews recover value from failed launches.',
     cost: 1,
     maxLevel: 1,
-    unlocks: 'Unlocks Salvage Useful Parts card and the recovery system.',
+    prerequisites: ['blackBoxRecovery'],
+    unlocks: 'Unlocks Salvage Useful Parts, recovery hardware, and extra explosion salvage.',
   },
   {
     id: 'questionableInvestors',
@@ -23,6 +24,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     description: 'They ask no questions and expect fast launches.',
     cost: 1,
     maxLevel: 3,
+    prerequisites: ['blackBoxRecovery'],
     unlocks: '+$180 starting money per level.',
   },
   {
@@ -31,6 +33,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     description: 'Someone finally invents fins.',
     cost: 2,
     maxLevel: 1,
+    prerequisites: ['blackBoxRecovery'],
     unlocks: 'Unlocks fins and Stabilize the Fins card.',
   },
   {
@@ -39,6 +42,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     description: 'Parachutes, trackers, and people willing to search fields.',
     cost: 2,
     maxLevel: 1,
+    prerequisites: ['scrapyardEngineering'],
     unlocks: 'Improves recovery hardware and explosion salvage.',
   },
   {
@@ -47,6 +51,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     description: 'Stop aiming rockets with vibes.',
     cost: 2,
     maxLevel: 1,
+    prerequisites: ['basicStabilizers'],
     unlocks: 'Unlocks avionics and Recruit a Specialist card.',
   },
   {
@@ -55,6 +60,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     description: 'A pointy end is discovered.',
     cost: 3,
     maxLevel: 1,
+    prerequisites: ['basicStabilizers'],
     unlocks: 'Unlocks nose cone and better upper-atmosphere performance.',
   },
   {
@@ -63,6 +69,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     description: 'Bankruptcy becomes a structured learning event.',
     cost: 3,
     maxLevel: 3,
+    prerequisites: ['questionableInvestors'],
     unlocks: '+1 meta knowledge per bankruptcy per level.',
   },
 ];
@@ -86,6 +93,11 @@ export function hasMetaUpgrade(metaUpgrades: Record<MetaUpgradeId, number>, id: 
   return metaUpgrades[id] > 0;
 }
 
+export function isMetaUpgradeUnlocked(metaUpgrades: Record<MetaUpgradeId, number>, id: MetaUpgradeId): boolean {
+  const prerequisites = metaUpgradeById[id].prerequisites ?? [];
+  return prerequisites.every((prerequisite) => hasMetaUpgrade(metaUpgrades, prerequisite));
+}
+
 export function buyMetaUpgrade<T extends { knowledge: number; metaUpgrades: Record<MetaUpgradeId, number> }>(
   state: T,
   id: MetaUpgradeId,
@@ -93,7 +105,7 @@ export function buyMetaUpgrade<T extends { knowledge: number; metaUpgrades: Reco
   const spec = metaUpgradeById[id];
   const level = state.metaUpgrades[id];
 
-  if (level >= spec.maxLevel || state.knowledge < spec.cost) {
+  if (level >= spec.maxLevel || state.knowledge < spec.cost || !isMetaUpgradeUnlocked(state.metaUpgrades, id)) {
     return state;
   }
 

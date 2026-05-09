@@ -3,6 +3,7 @@ import type { MetaUpgradeId } from './types';
 import { hasMetaUpgrade } from './metaUpgrades';
 
 const emptyStats: PartStats = {
+  unlocked: false,
   reliability: 0,
   mass: 0,
   cost: 0,
@@ -15,22 +16,27 @@ const emptyStats: PartStats = {
   salvageRate: 0,
 };
 
+type NumericPartStat = Exclude<keyof PartStats, 'unlocked'>;
+
 export const baseParts: RocketParts = {
   engine: part({
-    reliability: 0.18,
+    unlocked: true,
+    reliability: 0.55,
     mass: 18,
     cost: 8,
     thrust: 28,
     burnTime: 0.65,
   }),
   fuelTank: part({
-    reliability: 0.22,
+    unlocked: true,
+    reliability: 0.58,
     mass: 14,
     cost: 4,
     fuelCapacity: 16,
   }),
   body: part({
-    reliability: 0.2,
+    unlocked: true,
+    reliability: 0.56,
     mass: 16,
     cost: 3,
     aerodynamics: 0.08,
@@ -57,7 +63,8 @@ export const baseParts: RocketParts = {
     stability: 0,
   }),
   launchMount: part({
-    reliability: 0.2,
+    unlocked: true,
+    reliability: 0.6,
     mass: 0,
     cost: 3,
     stability: 0.08,
@@ -79,6 +86,7 @@ export function createBaseParts(metaUpgrades?: Record<MetaUpgradeId, number>): R
 
   if (hasMetaUpgrade(metaUpgrades, 'basicStabilizers')) {
     parts.fins = part({
+      unlocked: true,
       reliability: 0.28,
       mass: 5,
       cost: 2,
@@ -89,6 +97,7 @@ export function createBaseParts(metaUpgrades?: Record<MetaUpgradeId, number>): R
 
   if (hasMetaUpgrade(metaUpgrades, 'guidanceProgram')) {
     parts.avionics = part({
+      unlocked: true,
       reliability: 0.2,
       mass: 3,
       cost: 5,
@@ -98,6 +107,7 @@ export function createBaseParts(metaUpgrades?: Record<MetaUpgradeId, number>): R
 
   if (hasMetaUpgrade(metaUpgrades, 'advancedAerodynamics')) {
     parts.noseCone = part({
+      unlocked: true,
       reliability: 0.32,
       mass: 4,
       cost: 2,
@@ -108,6 +118,7 @@ export function createBaseParts(metaUpgrades?: Record<MetaUpgradeId, number>): R
 
   if (hasMetaUpgrade(metaUpgrades, 'recoveryProgram') || hasMetaUpgrade(metaUpgrades, 'scrapyardEngineering')) {
     parts.recovery = part({
+      unlocked: true,
       reliability: 0.24,
       mass: 4,
       cost: 2,
@@ -132,23 +143,23 @@ export function deriveRocketStats(parts: RocketParts): DerivedRocketStats {
   const cost = sumParts(parts, 'cost');
   const thrustToWeight = thrust / Math.max(1, mass);
   const aerodynamics = weightedAverage([
-    [parts.noseCone.aerodynamics, 0.36],
-    [parts.fins.aerodynamics, 0.24],
+    [parts.noseCone.unlocked ? parts.noseCone.aerodynamics : parts.body.aerodynamics, 0.36],
+    [parts.fins.unlocked ? parts.fins.aerodynamics : parts.body.aerodynamics, 0.24],
     [parts.body.aerodynamics, 0.24],
     [parts.fuelTank.reliability, 0.08],
-    [parts.recovery.reliability, 0.08],
+    [parts.recovery.unlocked ? parts.recovery.reliability : parts.body.reliability, 0.08],
   ]);
   const stability = weightedAverage([
-    [parts.fins.stability, 0.36],
-    [parts.avionics.stability, 0.28],
+    [parts.fins.unlocked ? parts.fins.stability : parts.launchMount.stability, 0.36],
+    [parts.avionics.unlocked ? parts.avionics.stability : parts.launchMount.stability, 0.28],
     [parts.launchMount.stability, 0.2],
     [parts.body.reliability, 0.16],
   ]);
   const structuralReliability = weightedAverage([
     [parts.body.reliability, 0.38],
     [parts.fuelTank.reliability, 0.3],
-    [parts.noseCone.reliability, 0.18],
-    [parts.recovery.reliability, 0.14],
+    [parts.noseCone.unlocked ? parts.noseCone.reliability : parts.body.reliability, 0.18],
+    [parts.recovery.unlocked ? parts.recovery.reliability : parts.body.reliability, 0.14],
   ]);
   const ignitionReliability = weightedAverage([
     [parts.engine.reliability, 0.5],
@@ -158,17 +169,19 @@ export function deriveRocketStats(parts: RocketParts): DerivedRocketStats {
   const flightReliability = weightedAverage([
     [parts.engine.reliability, 0.24],
     [parts.body.reliability, 0.24],
-    [parts.fins.reliability, 0.18],
-    [parts.avionics.reliability, 0.2],
+    [parts.fins.unlocked ? parts.fins.reliability : parts.body.reliability, 0.18],
+    [parts.avionics.unlocked ? parts.avionics.reliability : parts.launchMount.reliability, 0.2],
     [parts.fuelTank.reliability, 0.14],
   ]);
   const heatTolerance = weightedAverage([
-    [parts.noseCone.heatTolerance, 0.45],
+    [parts.noseCone.unlocked ? parts.noseCone.heatTolerance : parts.body.heatTolerance, 0.45],
     [parts.body.heatTolerance, 0.35],
-    [parts.fins.reliability, 0.12],
-    [parts.avionics.reliability, 0.08],
+    [parts.fins.unlocked ? parts.fins.reliability : parts.body.reliability, 0.12],
+    [parts.avionics.unlocked ? parts.avionics.reliability : parts.launchMount.reliability, 0.08],
   ]);
-  const salvageRate = clamp(parts.recovery.salvageRate + parts.launchMount.reliability * 0.08, 0, 0.75);
+  const salvageRate = parts.recovery.unlocked
+    ? clamp(parts.recovery.salvageRate + parts.launchMount.reliability * 0.08, 0, 0.75)
+    : 0;
 
   return {
     thrust,
@@ -194,7 +207,7 @@ export function part(overrides: Partial<PartStats>): PartStats {
 export function improvePartStat(
   parts: RocketParts,
   partId: RocketPartId,
-  stat: keyof PartStats,
+  stat: NumericPartStat,
   amount: number,
 ): RocketParts {
   const next = cloneParts(parts);
@@ -206,7 +219,7 @@ export function improvePartStat(
   return next;
 }
 
-function sumParts(parts: RocketParts, stat: keyof PartStats): number {
+function sumParts(parts: RocketParts, stat: NumericPartStat): number {
   return (Object.keys(parts) as RocketPartId[]).reduce((sum, partId) => sum + parts[partId][stat], 0);
 }
 

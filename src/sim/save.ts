@@ -21,6 +21,7 @@ export function loadGame(storage: Storage = window.localStorage): GameState {
       ...createInitialState(parsed.seed),
       ...parsed,
       metaUpgrades: { ...defaultMetaUpgrades, ...parsed.metaUpgrades },
+      bankruptcyRewardClaimed: parsed.bankruptcyRewardClaimed ?? false,
       lessons: { ...defaultLessons, ...parsed.lessons },
       pendingLessonChoices: parsed.pendingLessonChoices ?? [],
       parts: parsed.parts
@@ -34,4 +35,8 @@ export function loadGame(storage: Storage = window.localStorage): GameState {
 
 export function saveGame(state: GameState, storage: Storage = window.localStorage): void {
   storage.setItem(saveKey, JSON.stringify(state));
+}
+
+export function clearSave(storage: Storage = window.localStorage): void {
+  storage.removeItem(saveKey);
 }

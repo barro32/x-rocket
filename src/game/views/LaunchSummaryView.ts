@@ -9,6 +9,7 @@ export class LaunchSummaryView {
     result: LaunchResult,
   ) {
     this.container = scene.add.container(640, 190).setDepth(19).setAlpha(0).setScale(0.92);
+    this.container.setScrollFactor(0);
 
     const panel = scene.add.rectangle(0, 0, 560, 118, 0x0b1024, 0.82);
     panel.setStrokeStyle(4, summaryColor(result), 1);
@@ -91,9 +92,5 @@ function summaryColor(result: LaunchResult): number {
 }
 
 function formatAltitude(meters: number): string {
-  if (meters < 1_000) {
-    return `${meters} m`;
-  }
-
-  return `${Math.floor(meters / 100) / 10} km`;
+  return `${Math.max(0, Math.floor(meters))} m`;
 }
