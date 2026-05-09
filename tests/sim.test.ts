@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bankruptcyReward, buyMetaUpgrade, chooseLesson, claimBankruptcyReward, createInitialState, isBankrupt, launchCost, restartCompany, simulateLaunch } from '../src/sim/game';
 import { applyLessonToParts, availableLessons, lessonSpecs } from '../src/sim/lessons';
-import { defaultMetaUpgrades, isMetaUpgradeUnlocked } from '../src/sim/metaUpgrades';
+import { defaultMetaUpgrades, isMetaUpgradeUnlocked, metaUpgradeById, metaUpgradeCost } from '../src/sim/metaUpgrades';
 import { deriveRocketStats } from '../src/sim/parts';
 import type { Rng } from '../src/sim/rng';
 import type { LessonId } from '../src/sim/types';
@@ -71,6 +71,13 @@ describe('rocket simulation', () => {
     expect(next.metaUpgrades.basicStabilizers).toBe(1);
     expect(next.parts.fins.mass).toBeGreaterThan(0);
     expect(availableLessons(next)).toContain('stabilizeFins');
+  });
+
+  it('meta upgrade costs scale for multi-level nodes', () => {
+    const spec = metaUpgradeById.questionableInvestors;
+
+    expect(metaUpgradeCost(spec, 0)).toBeLessThan(metaUpgradeCost(spec, 1));
+    expect(metaUpgradeCost(spec, 1)).toBeLessThan(metaUpgradeCost(spec, 2));
   });
 
   it('advances company name on bankruptcy restart without base bankruptcy knowledge', () => {
@@ -163,6 +170,52 @@ describe('rocket simulation', () => {
     const next = restartCompany(state);
 
     expect(next.money).toBeGreaterThan(restartCompany({ ...createInitialState(1), money: 0 }).money);
+  });
+
+  it('supplier contracts lowers launch cost', () => {
+    const state = createInitialState(1, { ...defaultMetaUpgrades, scrapyardEngineering: 1, supplierContracts: 2 });
+
+    expect(launchCost(state)).toBeLessThan(launchCost(createInitialState(1)));
+  });
+
+  it('prototype archive grants startup lesson drafts', () => {
+    const state = createInitialState(1, {
+      ...defaultMetaUpgrades,
+      blackBoxRecovery: 1,
+      failureReviewBoard: 1,
+      prototypeArchive: 2,
+    });
+
+    expect(state.pendingLessonChoices).toHaveLength(2);
+    expect(state.pendingLessonChoices.every((id) => availableLessons(state).includes(id))).toBe(true);
+  });
+
+  it('mission control increases post-launch draft size', () => {
+    const state = createInitialState(1, {
+      ...defaultMetaUpgrades,
+      blackBoxRecovery: 1,
+      basicStabilizers: 1,
+      guidanceProgram: 1,
+      failureReviewBoard: 1,
+      missionControl: 2,
+    });
+    const next = simulateLaunch(state, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0.5, 0.5, 0.5]));
+
+    expect(next.pendingLessonChoices).toHaveLength(5);
+  });
+
+  it('safety review board vetoes one catastrophic explosion per company', () => {
+    const state = createInitialState(1, {
+      ...defaultMetaUpgrades,
+      blackBoxRecovery: 1,
+      failureReviewBoard: 1,
+      safetyReviewBoard: 1,
+    });
+    const next = simulateLaunch(state, new FixedRng([0, 0.2, 0.8, 0.1, 0.5, 0.9]));
+
+    expect(next.lastLaunch?.outcome).not.toBe('exploded');
+    expect(next.safetyReviewUses).toBe(1);
+    expect(next.lastLaunch?.message).toContain('Safety board vetoed the explosion');
   });
 
   it('every lesson either changes part stats or explicitly changes bankruptcy reward', () => {

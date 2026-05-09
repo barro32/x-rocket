@@ -5,7 +5,8 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     id: 'blackBoxRecovery',
     name: 'Black Box Recovery',
     description: 'Recovered telemetry unlocks dangerous failure lessons.',
-    cost: 1,
+    baseCost: 1,
+    costGrowth: 1,
     maxLevel: 1,
     unlocks: 'Unlocks Improve Fuel Flow and Cut Dead Weight cards.',
   },
@@ -13,7 +14,8 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     id: 'scrapyardEngineering',
     name: 'Scrapyard Engineering',
     description: 'Salvage crews recover value from failed launches.',
-    cost: 1,
+    baseCost: 2,
+    costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['blackBoxRecovery'],
     unlocks: 'Unlocks Salvage Useful Parts, recovery hardware, and extra explosion salvage.',
@@ -22,16 +24,18 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     id: 'questionableInvestors',
     name: 'Questionable Investors',
     description: 'They ask no questions and expect fast launches.',
-    cost: 1,
-    maxLevel: 3,
+    baseCost: 1,
+    costGrowth: 2.2,
+    maxLevel: 5,
     prerequisites: ['blackBoxRecovery'],
-    unlocks: '+$180 starting money per level.',
+    unlocks: '+$180 starting and restart money per level.',
   },
   {
     id: 'basicStabilizers',
     name: 'Basic Stabilizers',
     description: 'Someone finally invents fins.',
-    cost: 2,
+    baseCost: 2,
+    costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['blackBoxRecovery'],
     unlocks: 'Unlocks fins and Stabilize the Fins card.',
@@ -40,16 +44,78 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     id: 'recoveryProgram',
     name: 'Recovery Program',
     description: 'Parachutes, trackers, and people willing to search fields.',
-    cost: 2,
+    baseCost: 2,
+    costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['scrapyardEngineering'],
     unlocks: 'Improves recovery hardware and explosion salvage.',
   },
   {
+    id: 'supplierContracts',
+    name: 'Supplier Contracts',
+    description: 'Bulk rates and better procurement keep launch costs under control.',
+    baseCost: 2,
+    costGrowth: 1.85,
+    maxLevel: 4,
+    prerequisites: ['scrapyardEngineering'],
+    unlocks: 'Launch cost -6% per level.',
+  },
+  {
+    id: 'failureReviewBoard',
+    name: 'Failure Review Board',
+    description: 'Bankruptcy becomes a structured learning event.',
+    baseCost: 3,
+    costGrowth: 1.95,
+    maxLevel: 5,
+    prerequisites: ['questionableInvestors'],
+    unlocks: '+1 meta knowledge per bankruptcy per level.',
+  },
+  {
+    id: 'prototypeArchive',
+    name: 'Prototype Archive',
+    description: 'New companies begin with archived lesson drafts.',
+    baseCost: 2,
+    costGrowth: 1.9,
+    maxLevel: 3,
+    prerequisites: ['failureReviewBoard'],
+    unlocks: 'New companies start with 1 additional lesson choice per level.',
+  },
+  {
+    id: 'safetyReviewBoard',
+    name: 'Safety Review Board',
+    description: 'A single catastrophic failure can be vetoed each company.',
+    baseCost: 3,
+    costGrowth: 2.1,
+    maxLevel: 2,
+    prerequisites: ['failureReviewBoard'],
+    unlocks: 'Each level grants one explosion shield per company.',
+  },
+  {
+    id: 'missionControl',
+    name: 'Mission Control',
+    description: 'Better flight controllers keep the crew ahead of the rocket.',
+    baseCost: 3,
+    costGrowth: 2,
+    maxLevel: 3,
+    prerequisites: ['prototypeArchive'],
+    unlocks: 'Every post-launch lesson draft gains +1 choice per level.',
+  },
+  {
+    id: 'crashLab',
+    name: 'Crash Lab',
+    description: 'Explosions now generate much better follow-up questions.',
+    baseCost: 3,
+    costGrowth: 2.15,
+    maxLevel: 3,
+    prerequisites: ['safetyReviewBoard'],
+    unlocks: 'Exploded launches add +1 lesson choice per level.',
+  },
+  {
     id: 'guidanceProgram',
     name: 'Guidance Program',
     description: 'Stop aiming rockets with vibes.',
-    cost: 2,
+    baseCost: 2,
+    costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['basicStabilizers'],
     unlocks: 'Unlocks avionics and Recruit a Specialist card.',
@@ -58,19 +124,11 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     id: 'advancedAerodynamics',
     name: 'Advanced Aerodynamics',
     description: 'A pointy end is discovered.',
-    cost: 3,
+    baseCost: 3,
+    costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['basicStabilizers'],
     unlocks: 'Unlocks nose cone and better upper-atmosphere performance.',
-  },
-  {
-    id: 'failureReviewBoard',
-    name: 'Failure Review Board',
-    description: 'Bankruptcy becomes a structured learning event.',
-    cost: 3,
-    maxLevel: 3,
-    prerequisites: ['questionableInvestors'],
-    unlocks: '+1 meta knowledge per bankruptcy per level.',
   },
 ];
 
@@ -84,6 +142,11 @@ export const defaultMetaUpgrades: Record<MetaUpgradeId, number> = {
   questionableInvestors: 0,
   basicStabilizers: 0,
   recoveryProgram: 0,
+  supplierContracts: 0,
+  prototypeArchive: 0,
+  safetyReviewBoard: 0,
+  missionControl: 0,
+  crashLab: 0,
   guidanceProgram: 0,
   advancedAerodynamics: 0,
   failureReviewBoard: 0,
@@ -98,20 +161,25 @@ export function isMetaUpgradeUnlocked(metaUpgrades: Record<MetaUpgradeId, number
   return prerequisites.every((prerequisite) => hasMetaUpgrade(metaUpgrades, prerequisite));
 }
 
+export function metaUpgradeCost(spec: MetaUpgradeSpec, currentLevel: number): number {
+  return Math.max(1, Math.ceil(spec.baseCost * Math.pow(spec.costGrowth, currentLevel)));
+}
+
 export function buyMetaUpgrade<T extends { knowledge: number; metaUpgrades: Record<MetaUpgradeId, number> }>(
   state: T,
   id: MetaUpgradeId,
 ): T {
   const spec = metaUpgradeById[id];
   const level = state.metaUpgrades[id];
+  const cost = metaUpgradeCost(spec, level);
 
-  if (level >= spec.maxLevel || state.knowledge < spec.cost || !isMetaUpgradeUnlocked(state.metaUpgrades, id)) {
+  if (level >= spec.maxLevel || state.knowledge < cost || !isMetaUpgradeUnlocked(state.metaUpgrades, id)) {
     return state;
   }
 
   return {
     ...state,
-    knowledge: state.knowledge - spec.cost,
+    knowledge: state.knowledge - cost,
     metaUpgrades: {
       ...state.metaUpgrades,
       [id]: level + 1,

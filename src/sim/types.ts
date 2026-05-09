@@ -17,6 +17,11 @@ export type MetaUpgradeId =
   | 'questionableInvestors'
   | 'basicStabilizers'
   | 'recoveryProgram'
+  | 'supplierContracts'
+  | 'prototypeArchive'
+  | 'safetyReviewBoard'
+  | 'missionControl'
+  | 'crashLab'
   | 'guidanceProgram'
   | 'advancedAerodynamics'
   | 'failureReviewBoard';
@@ -48,7 +53,8 @@ export interface MetaUpgradeSpec {
   id: MetaUpgradeId;
   name: string;
   description: string;
-  cost: number;
+  baseCost: number;
+  costGrowth: number;
   maxLevel: number;
   prerequisites?: MetaUpgradeId[];
   unlocks: string;
@@ -101,6 +107,7 @@ export interface GameState {
   money: number;
   knowledge: number;
   metaUpgrades: Record<MetaUpgradeId, number>;
+  safetyReviewUses: number;
   companyIndex: number;
   launches: number;
   bankruptcies: number;

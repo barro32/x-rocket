@@ -43,7 +43,7 @@ export class GameScene extends Phaser.Scene {
     this.devStats = new DevStatsView(this);
     this.metaProgress = new MetaProgressView(this, {
       onBuy: (id) => this.buyMeta(id),
-      onContinue: () => this.startNextCompany(),
+      onContinue: () => void this.startNextCompany(),
     });
 
     this.rocket.resetToHangar();
@@ -193,7 +193,7 @@ export class GameScene extends Phaser.Scene {
     this.effects.floatingText('Meta unlocked', 640, 190, '#8ef6c5');
   }
 
-  private startNextCompany(): void {
+  private async startNextCompany(): Promise<void> {
     if (!isBankrupt(this.state)) {
       this.metaProgress.hide();
       return;
@@ -205,6 +205,10 @@ export class GameScene extends Phaser.Scene {
     this.persistAndRender();
     this.metaProgress.hide();
     this.effects.floatingText('+1 knowledge', 640, 170, '#8ef6c5');
+    if (this.state.pendingLessonChoices.length > 0) {
+      await wait(this, 180);
+      await this.showLessonCards(new Phaser.Math.Vector2(this.world.launchPad.x, 300));
+    }
   }
 
   private resetGame(): void {

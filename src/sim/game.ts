@@ -1,6 +1,6 @@
 import { Mulberry32, type Rng } from './rng';
 import { applyLessonToParts, availableLessons, defaultLessons } from './lessons';
-import { buyMetaUpgrade as buyMetaUpgradeCore, defaultMetaUpgrades } from './metaUpgrades';
+import { buyMetaUpgrade as buyMetaUpgradeCore, defaultMetaUpgrades, metaUpgradeCost } from './metaUpgrades';
 import { createBaseParts, deriveRocketStats } from './parts';
 import type { FailurePhase, GameState, LaunchResult, RocketPartId, LessonId, MetaUpgradeId } from './types';
 
@@ -10,19 +10,21 @@ const restartLoan = 100;
 const baseLaunchCost = 50;
 
 export function createInitialState(seed = Date.now(), metaUpgrades = defaultMetaUpgrades): GameState {
+  const normalizedMetaUpgrades = { ...defaultMetaUpgrades, ...metaUpgrades };
   return {
     version: 1,
-    money: startingMoneyFor(metaUpgrades),
+    money: startingMoneyFor(normalizedMetaUpgrades),
     knowledge: 0,
-    metaUpgrades: { ...defaultMetaUpgrades, ...metaUpgrades },
+    metaUpgrades: normalizedMetaUpgrades,
+    safetyReviewUses: 0,
     companyIndex: 23,
     launches: 0,
     bankruptcies: 0,
     bankruptcyRewardClaimed: false,
     highestAltitudeMeters: 0,
     lessons: { ...defaultLessons },
-    pendingLessonChoices: [],
-    parts: createBaseParts(metaUpgrades),
+    pendingLessonChoices: draftStartupLessonChoices(normalizedMetaUpgrades, seed),
+    parts: createBaseParts(normalizedMetaUpgrades),
     unlockedLayers: {
       ground: true,
       orbit: false,
@@ -50,7 +52,8 @@ export function buyMetaUpgrade(state: GameState, id: MetaUpgradeId): GameState {
 
 export function launchCost(state: GameState): number {
   const assemblyDiscount = Math.min(0.64, state.lessons.standardizeAssembly * 0.08);
-  return Math.max(6, Math.floor(baseLaunchCost * (1 - assemblyDiscount)));
+  const contractDiscount = Math.min(0.34, state.metaUpgrades.supplierContracts * 0.06);
+  return Math.max(6, Math.floor(baseLaunchCost * (1 - assemblyDiscount - contractDiscount)));
 }
 
 export function isBankrupt(state: GameState): boolean {
@@ -75,14 +78,16 @@ export function chooseLesson(state: GameState, id: LessonId): GameState {
 
 export function restartCompany(state: GameState): GameState {
   const claimedState = claimBankruptcyReward(state);
+  const nextSeed = claimedState.seed + 1;
 
   return {
-    ...createInitialState(claimedState.seed + 1, claimedState.metaUpgrades),
+    ...createInitialState(nextSeed, claimedState.metaUpgrades),
     money: restartMoneyFor(claimedState.metaUpgrades),
     knowledge: claimedState.knowledge,
     companyIndex: claimedState.companyIndex + 1,
     bankruptcies: claimedState.bankruptcies + 1,
     highestAltitudeMeters: claimedState.highestAltitudeMeters,
+    safetyReviewUses: 0,
     unlockedLayers: { ...claimedState.unlockedLayers },
   };
 }
@@ -156,7 +161,17 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
   const orbitRoll = rng.next();
 
   let outcome: LaunchResult['outcome'] = 'failed';
-  if (failure?.explodes) {
+  let effectiveFailure = failure;
+  let safetyReviewUses = state.safetyReviewUses;
+  if (failure?.explodes && state.metaUpgrades.safetyReviewBoard > safetyReviewUses) {
+    effectiveFailure = {
+      ...failure,
+      explodes: false,
+    };
+    safetyReviewUses += 1;
+  }
+
+  if (effectiveFailure?.explodes) {
     outcome = 'exploded';
   } else if (altitudeMeters >= orbitAltitudeMeters && orbitRoll < reliability) {
     outcome = 'orbit';
@@ -172,9 +187,9 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     altitudeMeters,
     moneyDelta,
     reliability,
-    failurePhase: failure?.phase,
-    failedPart: failure?.part,
-    message: launchMessage(outcome, altitudeMeters, failure),
+    failurePhase: effectiveFailure?.phase,
+    failedPart: effectiveFailure?.part,
+    message: launchMessage(outcome, altitudeMeters, effectiveFailure, safetyReviewUses > state.safetyReviewUses),
   };
 
   return {
@@ -183,8 +198,9 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     knowledge: state.knowledge + 1,
     launches: state.launches + 1,
     highestAltitudeMeters,
+    safetyReviewUses,
     lastLaunch: result,
-    pendingLessonChoices: draftLessonChoices(state, rng),
+    pendingLessonChoices: draftLessonChoices(state, rng, outcome),
     unlockedLayers: {
       ...state.unlockedLayers,
       orbit: state.unlockedLayers.orbit || outcome === 'orbit',
@@ -251,18 +267,20 @@ function launchMessage(
   outcome: LaunchResult['outcome'],
   altitudeMeters: number,
   failure?: FailureResult,
+  shielded = false,
 ): string {
   const altitudeM = Math.floor(altitudeMeters);
 
   if (failure) {
     const partName = partLabel(failure.part);
+    const shieldNote = shielded ? ' Safety board vetoed the explosion.' : '';
     if (failure.phase === 'ignition') {
-      return `${partName} failed during ignition. The pad crew ducked.`;
+      return `${partName} failed during ignition. The pad crew ducked.${shieldNote}`;
     }
     if (failure.explodes) {
-      return `${partName} failed at ${altitudeM} m. Vehicle destroyed.`;
+      return `${partName} failed at ${altitudeM} m. Vehicle destroyed.${shieldNote}`;
     }
-    return `${partName} failed at ${altitudeM} m. Flight ended early.`;
+    return `${partName} failed at ${altitudeM} m. Flight ended early.${shieldNote}`;
   }
 
   if (outcome === 'orbit') {
@@ -297,10 +315,25 @@ function partLabel(part: RocketPartId): string {
   }
 }
 
-function draftLessonChoices(state: GameState, rng: Rng): LessonId[] {
+function draftStartupLessonChoices(metaUpgrades: Record<MetaUpgradeId, number>, seed: number): LessonId[] {
+  const count = Math.min(3, metaUpgrades.prototypeArchive);
+  if (count <= 0) {
+    return [];
+  }
+
+  const state = createSyntheticState(seed, metaUpgrades, defaultLessons);
+  return draftChoices(state, new Mulberry32(seed ^ 0x7f4a7c15), Math.min(count, availableLessons(state).length));
+}
+
+function draftLessonChoices(state: GameState, rng: Rng, outcome: LaunchResult['outcome']): LessonId[] {
+  const countBonus = state.metaUpgrades.missionControl + (outcome === 'exploded' ? state.metaUpgrades.crashLab : 0);
+  const baseCount = 3 + countBonus + (state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 3 === 0 ? 1 : 0);
+  const targetCount = Math.min(5, Math.max(3, baseCount), availableLessons(state).length);
+  return draftChoices(state, rng, targetCount);
+}
+
+function draftChoices(state: GameState, rng: Rng, targetCount: number): LessonId[] {
   const pool = availableLessons(state);
-  const choiceCount = state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 3 === 0 ? 4 : 3;
-  const targetCount = Math.min(choiceCount, pool.length);
   const choices: LessonId[] = [];
 
   while (choices.length < targetCount) {
@@ -310,6 +343,37 @@ function draftLessonChoices(state: GameState, rng: Rng): LessonId[] {
   }
 
   return choices;
+}
+
+function createSyntheticState(
+  seed: number,
+  metaUpgrades: Record<MetaUpgradeId, number>,
+  lessons: Record<LessonId, number>,
+): GameState {
+  return {
+    version: 1,
+    money: 0,
+    knowledge: 0,
+    metaUpgrades: { ...defaultMetaUpgrades, ...metaUpgrades },
+    safetyReviewUses: 0,
+    companyIndex: 0,
+    launches: 0,
+    bankruptcies: 0,
+    bankruptcyRewardClaimed: false,
+    highestAltitudeMeters: 0,
+    lessons: { ...defaultLessons, ...lessons },
+    pendingLessonChoices: [],
+    parts: createBaseParts(metaUpgrades),
+    unlockedLayers: {
+      ground: true,
+      orbit: false,
+      station: false,
+      moon: false,
+      mars: false,
+      solar: false,
+    },
+    seed,
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {

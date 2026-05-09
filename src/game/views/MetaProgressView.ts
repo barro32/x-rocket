@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isMetaUpgradeUnlocked, metaUpgradeById, metaUpgradeSpecs } from '../../sim/metaUpgrades';
+import { isMetaUpgradeUnlocked, metaUpgradeById, metaUpgradeCost, metaUpgradeSpecs } from '../../sim/metaUpgrades';
 import type { GameState, MetaUpgradeId } from '../../sim/types';
 
 interface MetaProgressViewConfig {
@@ -16,14 +16,19 @@ interface MetaNode {
 }
 
 const nodePositions: Record<MetaUpgradeId, { x: number; y: number }> = {
-  blackBoxRecovery: { x: 0, y: -40 },
-  scrapyardEngineering: { x: -260, y: 40 },
+  blackBoxRecovery: { x: 0, y: -55 },
+  scrapyardEngineering: { x: -260, y: 20 },
   questionableInvestors: { x: 0, y: 140 },
-  basicStabilizers: { x: 260, y: 40 },
-  recoveryProgram: { x: -360, y: 185 },
-  failureReviewBoard: { x: 0, y: 270 },
-  guidanceProgram: { x: 190, y: 220 },
-  advancedAerodynamics: { x: 365, y: 185 },
+  basicStabilizers: { x: 260, y: 20 },
+  recoveryProgram: { x: -390, y: 160 },
+  supplierContracts: { x: -250, y: 210 },
+  failureReviewBoard: { x: 0, y: 265 },
+  prototypeArchive: { x: 0, y: 370 },
+  safetyReviewBoard: { x: 170, y: 210 },
+  missionControl: { x: 0, y: 470 },
+  crashLab: { x: 170, y: 340 },
+  guidanceProgram: { x: 255, y: 190 },
+  advancedAerodynamics: { x: 390, y: 160 },
 };
 
 export class MetaProgressView {
@@ -126,7 +131,8 @@ export class MetaProgressView {
       const level = state.metaUpgrades[node.id];
       const unlocked = isMetaUpgradeUnlocked(state.metaUpgrades, node.id);
       const maxed = level >= spec.maxLevel;
-      const affordable = unlocked && state.knowledge >= spec.cost && !maxed;
+      const cost = metaUpgradeCost(spec, level);
+      const affordable = unlocked && state.knowledge >= cost && !maxed;
 
       const fill = maxed ? 0x8ef6c5 : affordable ? 0xffd166 : unlocked ? 0xf6e7c7 : 0x30394d;
       const stroke = maxed ? 0x1bd88f : affordable ? 0xff6b35 : unlocked ? 0xf4c95d : 0x6c7487;
@@ -135,7 +141,7 @@ export class MetaProgressView {
       node.ring.setFillStyle(fill, unlocked ? 1 : 0.78);
       node.ring.setStrokeStyle(4, stroke, 1);
       node.label.setColor(textColor);
-      node.label.setText(`${spec.name}\n${level}/${spec.maxLevel}\n${maxed ? 'MAX' : `${spec.cost}K`}`);
+      node.label.setText(`${spec.name}\n${level}/${spec.maxLevel}\n${maxed ? 'MAX' : `${cost}K`}`);
     });
   }
 

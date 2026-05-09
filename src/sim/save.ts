@@ -22,6 +22,7 @@ export function loadGame(storage: Storage = window.localStorage): GameState {
       ...parsed,
       metaUpgrades: { ...defaultMetaUpgrades, ...parsed.metaUpgrades },
       bankruptcyRewardClaimed: parsed.bankruptcyRewardClaimed ?? false,
+      safetyReviewUses: parsed.safetyReviewUses ?? 0,
       lessons: { ...defaultLessons, ...parsed.lessons },
       pendingLessonChoices: parsed.pendingLessonChoices ?? [],
       parts: parsed.parts
