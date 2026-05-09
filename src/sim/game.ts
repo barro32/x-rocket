@@ -1,8 +1,17 @@
 import { Mulberry32, type Rng } from './rng';
-import { applyLessonToParts, availableLessons, defaultLessons } from './lessons';
+import { availableLessons, defaultLessons, rebuildRocketStats } from './lessons';
 import { buyMetaUpgrade as buyMetaUpgradeCore, defaultMetaUpgrades, metaUpgradeCost } from './metaUpgrades';
-import { createBaseParts, deriveRocketStats } from './parts';
-import type { FailurePhase, GameState, LaunchResult, RocketPartId, LessonId, MetaUpgradeId } from './types';
+import { launchVariance, orbitScoreThreshold, performanceStatIds, rocketScore, statLabel, type PerformanceStatId } from './rocketStats';
+import type {
+  FailurePhase,
+  GameState,
+  LaunchResult,
+  LessonId,
+  MetaUpgradeId,
+  RocketStatId,
+  RocketStats,
+  RolledRocketStats,
+} from './types';
 
 const orbitAltitudeMeters = 100_000;
 const startingMoney = 100;
@@ -12,7 +21,7 @@ const baseLaunchCost = 50;
 export function createInitialState(seed = Date.now(), metaUpgrades = defaultMetaUpgrades): GameState {
   const normalizedMetaUpgrades = { ...defaultMetaUpgrades, ...metaUpgrades };
   return {
-    version: 1,
+    version: 2,
     money: startingMoneyFor(normalizedMetaUpgrades),
     knowledge: 0,
     metaUpgrades: normalizedMetaUpgrades,
@@ -24,7 +33,7 @@ export function createInitialState(seed = Date.now(), metaUpgrades = defaultMeta
     highestAltitudeMeters: 0,
     lessons: { ...defaultLessons },
     pendingLessonChoices: draftStartupLessonChoices(normalizedMetaUpgrades, seed),
-    parts: createBaseParts(normalizedMetaUpgrades),
+    rocketStats: rebuildRocketStats(normalizedMetaUpgrades, defaultLessons),
     unlockedLayers: {
       ground: true,
       orbit: false,
@@ -45,7 +54,7 @@ export function buyMetaUpgrade(state: GameState, id: MetaUpgradeId): GameState {
 
   return {
     ...next,
-    parts: createBaseParts(next.metaUpgrades),
+    rocketStats: rebuildRocketStats(next.metaUpgrades, next.lessons),
     pendingLessonChoices: [],
   };
 }
@@ -65,13 +74,15 @@ export function chooseLesson(state: GameState, id: LessonId): GameState {
     return state;
   }
 
+  const nextLessons = {
+    ...state.lessons,
+    [id]: state.lessons[id] + 1,
+  };
+
   return {
     ...state,
-    lessons: {
-      ...state.lessons,
-      [id]: state.lessons[id] + 1,
-    },
-    parts: applyLessonToParts(state.parts, id),
+    lessons: nextLessons,
+    rocketStats: rebuildRocketStats(state.metaUpgrades, nextLessons),
     pendingLessonChoices: [],
   };
 }
@@ -120,10 +131,9 @@ function calculateSalvage(
   cost: number,
   salvageRate: number,
   outcome: LaunchResult['outcome'],
-  scrapyardLevel: number,
 ): number {
   if (outcome === 'exploded') {
-    return Math.floor(cost * (salvageRate + scrapyardLevel * 0.08));
+    return Math.floor(cost * salvageRate);
   }
 
   if (outcome === 'failed') {
@@ -143,22 +153,15 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     return state;
   }
 
-  const stats = deriveRocketStats(state.parts);
-  const failure = rollFailure(stats, rng);
-  const reliability = clamp(
-    (stats.ignitionReliability + stats.flightReliability + stats.structuralReliability + stats.stability) / 4,
-    0.05,
-    0.96,
-  );
-  const volatilityFloor = 0.48 + stats.stability * 0.18;
-  const volatilityRange = Math.max(0.34, 0.98 - stats.stability * 0.32);
-  const volatility = volatilityFloor + rng.next() * volatilityRange;
-  const flightScore = stats.thrustToWeight * stats.burnTime * (0.72 + stats.aerodynamics) * (0.7 + stats.stability);
-  const nominalAltitudeMeters = Math.floor(280 * flightScore * volatility);
+  const variance = launchVariance(state.rocketStats);
+  const rolledStats = rollLaunchStats(state.rocketStats, rng, variance);
+  const failure = rollFailure(rolledStats, rng);
+  const reliability = state.rocketStats.reliability / 99;
+  const score = rocketScore(rolledStats);
+  const nominalAltitudeMeters = Math.floor(orbitAltitudeMeters * clamp(score / orbitScoreThreshold, 0.04, 1.15));
   const altitudeMeters = failure
     ? Math.floor(nominalAltitudeMeters * failure.altitudeFactor)
     : nominalAltitudeMeters;
-  const orbitRoll = rng.next();
 
   let outcome: LaunchResult['outcome'] = 'failed';
   let effectiveFailure = failure;
@@ -173,12 +176,12 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
 
   if (effectiveFailure?.explodes) {
     outcome = 'exploded';
-  } else if (altitudeMeters >= orbitAltitudeMeters && orbitRoll < reliability) {
+  } else if (score >= orbitScoreThreshold) {
     outcome = 'orbit';
   }
 
   const contractPayout = outcome === 'orbit' ? 220 : 0;
-  const salvage = calculateSalvage(cost, stats.salvageRate, outcome, state.metaUpgrades.scrapyardEngineering);
+  const salvage = calculateSalvage(cost, salvageRateFor(state), outcome);
   const moneyDelta = contractPayout + salvage - cost;
   const highestAltitudeMeters = Math.max(state.highestAltitudeMeters, altitudeMeters);
 
@@ -187,8 +190,10 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     altitudeMeters,
     moneyDelta,
     reliability,
+    score,
+    rolledStats,
     failurePhase: effectiveFailure?.phase,
-    failedPart: effectiveFailure?.part,
+    failedStat: effectiveFailure?.stat,
     message: launchMessage(outcome, altitudeMeters, effectiveFailure, safetyReviewUses > state.safetyReviewUses),
   };
 
@@ -210,53 +215,23 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
 
 interface FailureResult {
   phase: FailurePhase;
-  part: RocketPartId;
+  stat: RocketStatId;
   explodes: boolean;
   altitudeFactor: number;
 }
 
-function rollFailure(stats: ReturnType<typeof deriveRocketStats>, rng: Rng): FailureResult | undefined {
-  const checks: Array<FailureResult & { chance: number }> = [
-    {
-      phase: 'ignition',
-      part: 'engine',
-      explodes: true,
-      altitudeFactor: 0,
-      chance: 1 - stats.ignitionReliability,
-    },
-    {
-      phase: 'liftoff',
-      part: 'launchMount',
-      explodes: true,
-      altitudeFactor: 0.18,
-      chance: 1 - clamp((stats.ignitionReliability + stats.stability) / 2, 0, 1),
-    },
-    {
-      phase: 'ascent',
-      part: 'body',
-      explodes: true,
-      altitudeFactor: 0.55,
-      chance: 1 - stats.structuralReliability,
-    },
-    {
-      phase: 'upperAtmosphere',
-      part: 'noseCone',
-      explodes: false,
-      altitudeFactor: 0.72,
-      chance: 1 - clamp((stats.heatTolerance + stats.aerodynamics) / 2, 0, 1),
-    },
-    {
-      phase: 'orbitInsertion',
-      part: 'avionics',
-      explodes: false,
-      altitudeFactor: 0.9,
-      chance: 1 - clamp((stats.flightReliability + stats.stability) / 2, 0, 1),
-    },
-  ];
-
-  for (const check of checks) {
-    if (rng.next() < check.chance) {
-      return check;
+function rollFailure(
+  stats: RolledRocketStats,
+  rng: Rng,
+): FailureResult | undefined {
+  for (const statId of performanceStatIds) {
+    if (rng.next() < failureChanceFor(stats[statId])) {
+      return {
+        phase: statId,
+        stat: statId,
+        explodes: true,
+        altitudeFactor: failureAltitudeFactor(statId),
+      };
     }
   }
 
@@ -272,19 +247,16 @@ function launchMessage(
   const altitudeM = Math.floor(altitudeMeters);
 
   if (failure) {
-    const partName = partLabel(failure.part);
+    const statName = statLabel(failure.stat);
     const shieldNote = shielded ? ' Safety board vetoed the explosion.' : '';
-    if (failure.phase === 'ignition') {
-      return `${partName} failed during ignition. The pad crew ducked.${shieldNote}`;
-    }
     if (failure.explodes) {
-      return `${partName} failed at ${altitudeM} m. Vehicle destroyed.${shieldNote}`;
+      return `${statName} roll collapsed at ${altitudeM} m. Vehicle destroyed.${shieldNote}`;
     }
-    return `${partName} failed at ${altitudeM} m. Flight ended early.${shieldNote}`;
+    return `${statName} roll collapsed at ${altitudeM} m. Flight ended early.${shieldNote}`;
   }
 
   if (outcome === 'orbit') {
-    return `Stable orbit reached at ${altitudeM} m. Contracts unlocked.`;
+    return `Orbit reached at ${altitudeM} m. Contracts unlocked.`;
   }
 
   if (outcome === 'exploded') {
@@ -292,27 +264,6 @@ function launchMessage(
   }
 
   return `Flight topped out at ${altitudeM} m. Iterate and launch again.`;
-}
-
-function partLabel(part: RocketPartId): string {
-  switch (part) {
-    case 'engine':
-      return 'Engine';
-    case 'fuelTank':
-      return 'Fuel tank';
-    case 'body':
-      return 'Hull';
-    case 'noseCone':
-      return 'Nose cone';
-    case 'fins':
-      return 'Fins';
-    case 'avionics':
-      return 'Avionics';
-    case 'launchMount':
-      return 'Launch mount';
-    case 'recovery':
-      return 'Recovery system';
-  }
 }
 
 function draftStartupLessonChoices(metaUpgrades: Record<MetaUpgradeId, number>, seed: number): LessonId[] {
@@ -326,9 +277,9 @@ function draftStartupLessonChoices(metaUpgrades: Record<MetaUpgradeId, number>, 
 }
 
 function draftLessonChoices(state: GameState, rng: Rng, outcome: LaunchResult['outcome']): LessonId[] {
-  const countBonus = state.metaUpgrades.missionControl + (outcome === 'exploded' ? state.metaUpgrades.crashLab : 0);
-  const baseCount = 3 + countBonus + (state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 3 === 0 ? 1 : 0);
-  const targetCount = Math.min(5, Math.max(3, baseCount), availableLessons(state).length);
+  const countBonus = state.metaUpgrades.missionControl + (outcome !== 'orbit' ? state.metaUpgrades.crashLab : 0);
+  const baseCount = 3 + countBonus + (state.lessons.recruitSpecialist > 0 && (state.launches + 1) % 2 === 0 ? 1 : 0);
+  const targetCount = Math.min(Math.max(3, baseCount), availableLessons(state).length);
   return draftChoices(state, rng, targetCount);
 }
 
@@ -351,7 +302,7 @@ function createSyntheticState(
   lessons: Record<LessonId, number>,
 ): GameState {
   return {
-    version: 1,
+    version: 2,
     money: 0,
     knowledge: 0,
     metaUpgrades: { ...defaultMetaUpgrades, ...metaUpgrades },
@@ -363,7 +314,7 @@ function createSyntheticState(
     highestAltitudeMeters: 0,
     lessons: { ...defaultLessons, ...lessons },
     pendingLessonChoices: [],
-    parts: createBaseParts(metaUpgrades),
+    rocketStats: rebuildRocketStats(metaUpgrades, lessons),
     unlockedLayers: {
       ground: true,
       orbit: false,
@@ -378,4 +329,53 @@ function createSyntheticState(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function rollLaunchStats(
+  stats: RocketStats,
+  rng: Rng,
+  variance: number,
+): RolledRocketStats {
+  return {
+    thrust: rollStat(stats.thrust, variance, rng),
+    fuel: rollStat(stats.fuel, variance, rng),
+    aerodynamics: rollStat(stats.aerodynamics, variance, rng),
+    lightness: rollStat(stats.lightness, variance, rng),
+    guidance: rollStat(stats.guidance, variance, rng),
+  };
+}
+
+function rollStat(baseValue: number, variance: number, rng: Rng): number {
+  const spread = Math.round((rng.next() * 2 - 1) * variance);
+  return clamp(baseValue + spread, 0, 99);
+}
+
+function failureChanceFor(statValue: number): number {
+  return clamp(0.024 - statValue * 0.00019, 0.005, 0.024);
+}
+
+function failureAltitudeFactor(statId: PerformanceStatId): number {
+  switch (statId) {
+    case 'thrust':
+      return 0.08;
+    case 'fuel':
+      return 0.24;
+    case 'lightness':
+      return 0.46;
+    case 'aerodynamics':
+      return 0.7;
+    case 'guidance':
+      return 0.88;
+  }
+}
+
+function salvageRateFor(state: GameState): number {
+  let salvageRate = state.lessons.salvageUsefulParts * 0.1;
+  if (state.metaUpgrades.scrapyardEngineering > 0) {
+    salvageRate += 0.08;
+  }
+  if (state.metaUpgrades.recoveryProgram > 0) {
+    salvageRate += 0.14;
+  }
+  return clamp(salvageRate, 0, 0.8);
 }

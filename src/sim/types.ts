@@ -26,17 +26,9 @@ export type MetaUpgradeId =
   | 'advancedAerodynamics'
   | 'failureReviewBoard';
 
-export type RocketPartId =
-  | 'engine'
-  | 'fuelTank'
-  | 'body'
-  | 'noseCone'
-  | 'fins'
-  | 'avionics'
-  | 'launchMount'
-  | 'recovery';
+export type RocketStatId = 'thrust' | 'fuel' | 'aerodynamics' | 'lightness' | 'guidance' | 'reliability';
 
-export type FailurePhase = 'ignition' | 'liftoff' | 'ascent' | 'upperAtmosphere' | 'orbitInsertion';
+export type FailurePhase = RocketStatId;
 
 export type LaunchOutcome = 'exploded' | 'failed' | 'orbit';
 
@@ -65,45 +57,26 @@ export interface LaunchResult {
   altitudeMeters: number;
   moneyDelta: number;
   reliability: number;
+  score: number;
+  rolledStats: RolledRocketStats;
   failurePhase?: FailurePhase;
-  failedPart?: RocketPartId;
+  failedStat?: RocketStatId;
   message: string;
 }
 
-export interface PartStats {
-  unlocked: boolean;
+export interface RocketStats {
+  thrust: number;
+  fuel: number;
+  aerodynamics: number;
+  lightness: number;
+  guidance: number;
   reliability: number;
-  mass: number;
-  cost: number;
-  thrust: number;
-  burnTime: number;
-  fuelCapacity: number;
-  aerodynamics: number;
-  stability: number;
-  heatTolerance: number;
-  salvageRate: number;
 }
 
-export type RocketParts = Record<RocketPartId, PartStats>;
-
-export interface DerivedRocketStats {
-  thrust: number;
-  burnTime: number;
-  fuelCapacity: number;
-  mass: number;
-  cost: number;
-  thrustToWeight: number;
-  aerodynamics: number;
-  stability: number;
-  structuralReliability: number;
-  ignitionReliability: number;
-  flightReliability: number;
-  heatTolerance: number;
-  salvageRate: number;
-}
+export type RolledRocketStats = Pick<RocketStats, 'thrust' | 'fuel' | 'aerodynamics' | 'lightness' | 'guidance'>;
 
 export interface GameState {
-  version: 1;
+  version: 2;
   money: number;
   knowledge: number;
   metaUpgrades: Record<MetaUpgradeId, number>;
@@ -116,7 +89,7 @@ export interface GameState {
   lastLaunch?: LaunchResult;
   lessons: Record<LessonId, number>;
   pendingLessonChoices: LessonId[];
-  parts: RocketParts;
+  rocketStats: RocketStats;
   unlockedLayers: Record<LayerId, boolean>;
   seed: number;
 }

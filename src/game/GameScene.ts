@@ -24,6 +24,7 @@ export class GameScene extends Phaser.Scene {
   private effects!: EffectsView;
   private activeCards: LessonCardView[] = [];
   private launchSummary?: LaunchSummaryView;
+  private nextLaunchPrep?: Promise<void>;
   private busy = false;
 
   constructor() {
@@ -38,6 +39,7 @@ export class GameScene extends Phaser.Scene {
     this.globalMenu = new GlobalMenuView(this, { onReset: () => this.resetGame() });
     this.hud = new HudView(this, {
       onPrimary: () => void this.primaryAction(),
+      onMeta: () => this.openMetaProgress(),
       onMenu: () => this.globalMenu.show(),
     });
     this.devStats = new DevStatsView(this);
@@ -63,9 +65,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (isBankrupt(this.state)) {
-      this.state = claimBankruptcyReward(this.state);
-      this.persistAndRender();
-      this.metaProgress.show(this.state);
+      this.openMetaProgress();
       return;
     }
 
@@ -75,10 +75,9 @@ export class GameScene extends Phaser.Scene {
   private async launchSequence(): Promise<void> {
     this.busy = true;
     this.renderState();
+    this.hud.beginLaunchRoll(this.state.rocketStats.reliability);
 
     await this.rocket.rolloutToPad();
-    this.effects.ignition(this.world.launchPad.x, this.world.launchPad.y);
-    await this.rocket.ignite();
 
     const beforeLaunches = this.state.launches;
     this.state = simulateLaunch(this.state);
@@ -95,10 +94,24 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const launchProfile = {
+      ...result.rolledStats,
+      reliability: this.state.rocketStats.reliability / 99,
+    };
+    const launchRollDuration = this.rocket.ignitionDuration(launchProfile) + this.rocket.flightDuration(result.altitudeMeters, launchProfile);
+
+    this.hud.animateLaunchRoll(result.rolledStats, this.state.rocketStats.reliability, launchRollDuration);
+
+    this.effects.ignition(this.world.launchPad.x, this.world.launchPad.y, {
+      thrust: result.rolledStats.thrust,
+      fuel: result.rolledStats.fuel,
+    });
+    await this.rocket.ignite(launchProfile);
+
     this.cameras.main.startFollow(this.rocket.sprite, true, 0.08, 0.12, 0, 130);
-    const finalPosition = await this.rocket.flyTo(result.altitudeMeters);
+    const finalPosition = await this.rocket.flyTo(result.altitudeMeters, launchProfile);
     this.cameras.main.stopFollow();
-    this.effects.floatingText(`${Math.floor(result.altitudeMeters)} m`, finalPosition.x, finalPosition.y - 40);
+    this.effects.floatingText(`${Math.floor(result.altitudeMeters)} m | Score ${Math.floor(result.score)}`, finalPosition.x, finalPosition.y - 40);
 
     let cardOrigin = finalPosition;
     if (result.outcome === 'exploded') {
@@ -108,9 +121,16 @@ export class GameScene extends Phaser.Scene {
       this.rocket.fadeAway();
     }
 
+    const cardScreenOrigin = this.worldToScreen(cardOrigin);
+    this.resetCamera();
+    this.nextLaunchPrep = this.rocket.recycleToPad().finally(() => {
+      this.nextLaunchPrep = undefined;
+    });
+
+    this.hud.endLaunchRoll(this.state.rocketStats);
     this.persistAndRender();
     await wait(this, 360);
-    await this.showLessonCards(this.worldToScreen(cardOrigin));
+    await this.showLessonCards(cardScreenOrigin);
     this.busy = false;
     this.renderState();
   }
@@ -168,8 +188,9 @@ export class GameScene extends Phaser.Scene {
     this.activeCards = [];
     this.launchSummary = undefined;
     this.state = chooseLesson(this.state, lessonId);
-    this.rocket.resetToHangar();
-    this.resetCamera();
+    if (this.nextLaunchPrep) {
+      await this.nextLaunchPrep;
+    }
     this.persistAndRender();
     this.effects.floatingText(lessonById[lessonId].name, 640, 190, '#f6e7c7');
     this.busy = false;
@@ -191,6 +212,19 @@ export class GameScene extends Phaser.Scene {
     this.persistAndRender();
     this.metaProgress.update(this.state);
     this.effects.floatingText('Meta unlocked', 640, 190, '#8ef6c5');
+  }
+
+  private openMetaProgress(): void {
+    if (this.busy || this.state.pendingLessonChoices.length > 0) {
+      return;
+    }
+
+    if (isBankrupt(this.state)) {
+      this.state = claimBankruptcyReward(this.state);
+      this.persistAndRender();
+    }
+
+    this.metaProgress.show(this.state);
   }
 
   private async startNextCompany(): Promise<void> {
@@ -244,6 +278,7 @@ export class GameScene extends Phaser.Scene {
       launchCost(this.state),
       isBankrupt(this.state),
       this.busy || this.state.pendingLessonChoices.length > 0,
+      this.state.rocketStats,
     );
     this.devStats.update(this.state);
     this.metaProgress.update(this.state);

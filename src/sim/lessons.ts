@@ -1,67 +1,67 @@
-import { improvePartStat } from './parts';
-import type { GameState, LessonId, LessonSpec, RocketParts } from './types';
+import { createBaseRocketStats, improveRocketStat } from './rocketStats';
+import type { GameState, LessonId, LessonSpec, MetaUpgradeId, RocketStats } from './types';
 
 export const lessonSpecs: LessonSpec[] = [
   {
     id: 'reinforceFrame',
     name: 'Reinforce the Frame',
-    description: 'Hull reliability up. Adds a little mass.',
-    effect: 'Hull reliability +5.5% | Mass +0.6',
+    description: 'Reliability up. Lightness drops a little.',
+    effect: 'Reliability +8 | Lightness -4',
     maxStacks: 10,
     unlock: 'failureReviewBoard',
   },
   {
     id: 'tuneEngineMix',
     name: 'Tune the Engine Mix',
-    description: 'Engine thrust up. Engine reliability down slightly.',
-    effect: 'Engine thrust +3.2 | Engine reliability -1.5% | Cost +$1',
+    description: 'Thrust up. Reliability down slightly.',
+    effect: 'Thrust +10 | Reliability -4',
     maxStacks: 10,
   },
   {
     id: 'improveFuelFlow',
     name: 'Improve Fuel Flow',
-    description: 'Engine burn time and reliability up.',
-    effect: 'Burn time +0.08s | Engine reliability +2.5%',
+    description: 'Fuel flow and consistency improve together.',
+    effect: 'Fuel +10 | Reliability +3',
     maxStacks: 10,
     unlock: 'blackBoxRecovery',
   },
   {
     id: 'salvageUsefulParts',
     name: 'Salvage Useful Parts',
-    description: 'Recovery salvage rate up.',
-    effect: 'Salvage rate +8%',
+    description: 'Failures return more usable hardware.',
+    effect: 'Salvage +10%',
     maxStacks: 5,
     unlock: 'scrapyardEngineering',
   },
   {
     id: 'stabilizeFins',
     name: 'Stabilize the Fins',
-    description: 'Fin stability and aerodynamics up. Adds a little mass.',
-    effect: 'Fin stability +5.5% | Aero +2.5% | Mass +0.25',
+    description: 'Flight control improves, but the rocket gets a little less light.',
+    effect: 'Guidance +8 | Aerodynamics +6 | Lightness -2',
     maxStacks: 8,
     unlock: 'basicStabilizers',
   },
   {
     id: 'cutDeadWeight',
     name: 'Cut Dead Weight',
-    description: 'Body and tank mass down. Hull reliability down.',
-    effect: 'Body mass -1.4 | Tank mass -0.8 | Hull reliability -2.5%',
+    description: 'The rocket gets lighter, but quality control slips.',
+    effect: 'Lightness +12 | Reliability -4',
     maxStacks: 8,
     unlock: 'blackBoxRecovery',
   },
   {
     id: 'standardizeAssembly',
     name: 'Standardize Assembly',
-    description: 'Launch mount reliability up. Build costs down.',
-    effect: 'Mount reliability +3.5% | Mount cost -$0.35 | Body cost -$0.25',
+    description: 'Launch operations get cheaper through repeatable process.',
+    effect: 'Launch cost -8%',
     maxStacks: 8,
     unlock: 'scrapyardEngineering',
   },
   {
     id: 'recruitSpecialist',
     name: 'Recruit a Specialist',
-    description: 'Avionics reliability up. Every third launch gets an extra choice.',
-    effect: 'Avionics reliability +2.5% | Extra choice every 3rd launch',
+    description: 'Guidance and reliability both jump. Every second launch gets an extra choice.',
+    effect: 'Guidance +12 | Reliability +8 | Extra choice every 2nd launch',
     maxStacks: 1,
     unlock: 'guidanceProgram',
   },
@@ -98,50 +98,45 @@ export function availableLessons(state: GameState): LessonId[] {
     .map((spec) => spec.id);
 }
 
-export function applyLessonToParts(parts: RocketParts, id: LessonId): RocketParts {
+export function applyLessonToRocketStats(stats: RocketStats, id: LessonId): RocketStats {
   switch (id) {
     case 'reinforceFrame':
-      return improvePartStat(improvePartStat(parts, 'body', 'reliability', 0.055), 'body', 'mass', 0.6);
+      return improveRocketStat(improveRocketStat(stats, 'reliability', 8), 'lightness', -4);
     case 'tuneEngineMix':
-      return improvePartStat(
-        improvePartStat(improvePartStat(parts, 'engine', 'thrust', 3.2), 'engine', 'reliability', -0.015),
-        'engine',
-        'cost',
-        1,
-      );
+      return improveRocketStat(improveRocketStat(stats, 'thrust', 10), 'reliability', -4);
     case 'improveFuelFlow':
-      return improvePartStat(
-        improvePartStat(parts, 'engine', 'burnTime', 0.08),
-        'engine',
-        'reliability',
-        0.025,
-      );
+      return improveRocketStat(improveRocketStat(stats, 'fuel', 10), 'reliability', 3);
     case 'salvageUsefulParts':
-      return improvePartStat(parts, 'recovery', 'salvageRate', 0.08);
+      return stats;
     case 'stabilizeFins':
-      return improvePartStat(
-        improvePartStat(improvePartStat(parts, 'fins', 'stability', 0.055), 'fins', 'aerodynamics', 0.025),
-        'fins',
-        'mass',
-        0.25,
+      return improveRocketStat(
+        improveRocketStat(improveRocketStat(stats, 'guidance', 8), 'aerodynamics', 6),
+        'lightness',
+        -2,
       );
     case 'cutDeadWeight':
-      return improvePartStat(
-        improvePartStat(improvePartStat(parts, 'body', 'mass', -1.4), 'fuelTank', 'mass', -0.8),
-        'body',
-        'reliability',
-        -0.025,
-      );
+      return improveRocketStat(improveRocketStat(stats, 'lightness', 12), 'reliability', -4);
     case 'standardizeAssembly':
-      return improvePartStat(
-        improvePartStat(improvePartStat(parts, 'launchMount', 'reliability', 0.035), 'launchMount', 'cost', -0.35),
-        'body',
-        'cost',
-        -0.25,
-      );
+      return stats;
     case 'recruitSpecialist':
-      return improvePartStat(parts, 'avionics', 'reliability', 0.025);
+      return improveRocketStat(improveRocketStat(stats, 'guidance', 12), 'reliability', 8);
     case 'documentEverything':
-      return parts;
+      return stats;
   }
+}
+
+export function rebuildRocketStats(
+  metaUpgrades: Record<MetaUpgradeId, number>,
+  lessons: Record<LessonId, number>,
+): RocketStats {
+  let stats = createBaseRocketStats(metaUpgrades);
+
+  for (const lesson of lessonSpecs) {
+    const stacks = lessons[lesson.id];
+    for (let index = 0; index < stacks; index += 1) {
+      stats = applyLessonToRocketStats(stats, lesson.id);
+    }
+  }
+
+  return stats;
 }

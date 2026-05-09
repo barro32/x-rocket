@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { deriveRocketStats } from '../../sim/parts';
+import { launchVariance, orbitScoreThreshold, rocketScore } from '../../sim/rocketStats';
 import type { GameState } from '../../sim/types';
 
 export class DevStatsView {
@@ -31,22 +31,19 @@ export class DevStatsView {
       return;
     }
 
-    const stats = deriveRocketStats(state.parts);
+    const stats = state.rocketStats;
     this.text.setText(
       [
         'DEV ROCKET STATS',
-        `cost: $${Math.floor(stats.cost)}`,
-        `mass: ${fmt(stats.mass)}`,
         `thrust: ${fmt(stats.thrust)}`,
-        `t/w: ${fmt(stats.thrustToWeight)}`,
-        `burn: ${fmt(stats.burnTime)}s`,
-        `aero: ${pct(stats.aerodynamics)}`,
-        `stability: ${pct(stats.stability)}`,
-        `ignition: ${pct(stats.ignitionReliability)}`,
-        `flight: ${pct(stats.flightReliability)}`,
-        `structure: ${pct(stats.structuralReliability)}`,
-        `heat: ${pct(stats.heatTolerance)}`,
-        `salvage: ${pct(stats.salvageRate)}`,
+        `fuel: ${fmt(stats.fuel)}`,
+        `aero: ${fmt(stats.aerodynamics)}`,
+        `lightness: ${fmt(stats.lightness)}`,
+        `guidance: ${fmt(stats.guidance)}`,
+        `reliability: ${fmt(stats.reliability)}`,
+        `variance: +/-${launchVariance(stats)}`,
+        `score: ${fmt(rocketScore(stats))}`,
+        `orbit: ${orbitScoreThreshold}`,
       ].join('\n'),
     );
   }
@@ -54,8 +51,4 @@ export class DevStatsView {
 
 function fmt(value: number): string {
   return `${Math.round(value * 100) / 100}`;
-}
-
-function pct(value: number): string {
-  return `${Math.round(value * 100)}%`;
 }

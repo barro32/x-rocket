@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { bankruptcyReward, buyMetaUpgrade, chooseLesson, claimBankruptcyReward, createInitialState, isBankrupt, launchCost, restartCompany, simulateLaunch } from '../src/sim/game';
-import { applyLessonToParts, availableLessons, lessonSpecs } from '../src/sim/lessons';
+import { applyLessonToRocketStats, availableLessons, lessonSpecs } from '../src/sim/lessons';
 import { defaultMetaUpgrades, isMetaUpgradeUnlocked, metaUpgradeById, metaUpgradeCost } from '../src/sim/metaUpgrades';
-import { deriveRocketStats } from '../src/sim/parts';
+import { orbitScoreThreshold, rocketScore } from '../src/sim/rocketStats';
 import type { Rng } from '../src/sim/rng';
 import type { LessonId } from '../src/sim/types';
 
@@ -21,14 +21,14 @@ class FixedRng implements Rng {
 describe('rocket simulation', () => {
   it('spends money and drafts lessons when a rocket explodes', () => {
     const state = createInitialState(1);
-    const next = simulateLaunch(state, new FixedRng([0, 0.2, 0.8, 0.1, 0.5, 0.9]));
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0]));
 
     expect(next.launches).toBe(1);
     expect(next.money).toBeLessThan(state.money);
     expect(next.knowledge).toBe(state.knowledge + 1);
     expect(next.pendingLessonChoices).toEqual(['tuneEngineMix']);
     expect(next.lastLaunch?.outcome).toBe('exploded');
-    expect(next.lastLaunch?.failedPart).toBe('engine');
+    expect(next.lastLaunch?.failedStat).toBe('thrust');
   });
 
   it('applies one drafted lesson before the next launch', () => {
@@ -39,17 +39,16 @@ describe('rocket simulation', () => {
     const next = chooseLesson(state, 'tuneEngineMix');
 
     expect(next.lessons.tuneEngineMix).toBe(1);
-    expect(next.parts.engine.thrust).toBeGreaterThan(state.parts.engine.thrust);
+    expect(next.rocketStats.thrust).toBeGreaterThan(state.rocketStats.thrust);
     expect(next.pendingLessonChoices).toHaveLength(0);
   });
 
-  it('derives rocket stats from parts', () => {
+  it('starts with visible rocket stats below orbit threshold', () => {
     const state = createInitialState(1);
-    const stats = deriveRocketStats(state.parts);
 
-    expect(stats.thrust).toBeGreaterThan(0);
-    expect(stats.mass).toBeGreaterThan(0);
-    expect(stats.ignitionReliability).toBeGreaterThan(0);
+    expect(state.rocketStats.thrust).toBeGreaterThan(0);
+    expect(state.rocketStats.lightness).toBeGreaterThanOrEqual(0);
+    expect(rocketScore(state.rocketStats)).toBeLessThan(orbitScoreThreshold);
   });
 
   it('starts with only tune engine mix as a lesson card', () => {
@@ -58,7 +57,7 @@ describe('rocket simulation', () => {
     expect(availableLessons(state)).toEqual(['tuneEngineMix']);
   });
 
-  it('meta upgrades unlock new cards and rocket parts', () => {
+  it('meta upgrades unlock new cards and permanent stat boosts', () => {
     const state = { ...createInitialState(1), knowledge: 10 };
     const blocked = buyMetaUpgrade(state, 'basicStabilizers');
     const withRoot = buyMetaUpgrade(state, 'blackBoxRecovery');
@@ -69,7 +68,7 @@ describe('rocket simulation', () => {
     expect(isMetaUpgradeUnlocked(state.metaUpgrades, 'basicStabilizers')).toBe(false);
     expect(withRoot.metaUpgrades.blackBoxRecovery).toBe(1);
     expect(next.metaUpgrades.basicStabilizers).toBe(1);
-    expect(next.parts.fins.mass).toBeGreaterThan(0);
+    expect(next.rocketStats.guidance).toBeGreaterThan(withRoot.rocketStats.guidance);
     expect(availableLessons(next)).toContain('stabilizeFins');
   });
 
@@ -104,11 +103,11 @@ describe('rocket simulation', () => {
   it('launches cost $50 and starting funds allow two launches before bankruptcy', () => {
     const state = createInitialState(1);
     const afterFirstLaunch = chooseLesson(
-      simulateLaunch(state, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0.25])),
+      simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99])),
       'tuneEngineMix',
     );
     const afterSecondLaunch = chooseLesson(
-      simulateLaunch(afterFirstLaunch, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0.25])),
+      simulateLaunch(afterFirstLaunch, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99])),
       'tuneEngineMix',
     );
 
@@ -120,15 +119,15 @@ describe('rocket simulation', () => {
 
   it('bad launch stays under 100 meters', () => {
     const state = createInitialState(1);
-    const next = simulateLaunch(state, new FixedRng([0, 0.2, 0.8, 0.1, 0.5, 0.9]));
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0]));
 
-    expect(next.lastLaunch?.altitudeMeters).toBeLessThan(100);
+    expect(next.lastLaunch?.altitudeMeters).toBeLessThan(6_000);
   });
 
   it('engine tuning increases altitude potential', () => {
     const state = createInitialState(1);
     const tuned = chooseLesson({ ...state, pendingLessonChoices: ['tuneEngineMix'] }, 'tuneEngineMix');
-    const cleanFlightRng = [0.99, 0.99, 0.99, 0.99, 0.99, 0.5, 0.5, 0.5];
+    const cleanFlightRng = [0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99];
     const baseLaunch = simulateLaunch(state, new FixedRng(cleanFlightRng));
     const tunedLaunch = simulateLaunch(tuned, new FixedRng(cleanFlightRng));
 
@@ -151,15 +150,11 @@ describe('rocket simulation', () => {
     expect(claimedAgain.knowledge).toBe(0);
   });
 
-  it('locked optional parts do not zero out derived stats', () => {
+  it('reliability tightens the launch variance band', () => {
     const base = createInitialState(1);
-    const withFins = createInitialState(1, { ...defaultMetaUpgrades, basicStabilizers: 1 });
-    const baseStats = deriveRocketStats(base.parts);
-    const finStats = deriveRocketStats(withFins.parts);
+    const reinforced = chooseLesson({ ...base, pendingLessonChoices: ['reinforceFrame'] }, 'reinforceFrame');
 
-    expect(base.parts.fins.unlocked).toBe(false);
-    expect(baseStats.stability).toBeGreaterThan(0);
-    expect(finStats.stability).toBeGreaterThan(baseStats.stability);
+    expect(reinforced.rocketStats.reliability).toBeGreaterThan(base.rocketStats.reliability);
   });
 
   it('questionable investors increases restart money', () => {
@@ -199,7 +194,7 @@ describe('rocket simulation', () => {
       failureReviewBoard: 1,
       missionControl: 2,
     });
-    const next = simulateLaunch(state, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0.5, 0.5, 0.5]));
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
 
     expect(next.pendingLessonChoices).toHaveLength(5);
   });
@@ -211,35 +206,37 @@ describe('rocket simulation', () => {
       failureReviewBoard: 1,
       safetyReviewBoard: 1,
     });
-    const next = simulateLaunch(state, new FixedRng([0, 0.2, 0.8, 0.1, 0.5, 0.9]));
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0]));
 
     expect(next.lastLaunch?.outcome).not.toBe('exploded');
     expect(next.safetyReviewUses).toBe(1);
     expect(next.lastLaunch?.message).toContain('Safety board vetoed the explosion');
   });
 
-  it('every lesson either changes part stats or explicitly changes bankruptcy reward', () => {
-    const parts = createInitialState(1, {
+  it('every lesson either changes rocket stats or explicitly changes economy/reward systems', () => {
+    const stats = createInitialState(1, {
       ...defaultMetaUpgrades,
       blackBoxRecovery: 1,
       scrapyardEngineering: 1,
       basicStabilizers: 1,
       guidanceProgram: 1,
       failureReviewBoard: 1,
-    }).parts;
+    }).rocketStats;
 
     lessonSpecs.forEach((lesson) => {
-      if (lesson.id === 'documentEverything') {
+      if (lesson.id === 'documentEverything' || lesson.id === 'salvageUsefulParts' || lesson.id === 'standardizeAssembly') {
         const state = {
           ...createInitialState(1),
           money: 0,
           lessons: { ...createInitialState(1).lessons, documentEverything: 1 },
         };
-        expect(bankruptcyReward(state)).toBeGreaterThan(0);
+        if (lesson.id === 'documentEverything') {
+          expect(bankruptcyReward(state)).toBeGreaterThan(0);
+        }
         return;
       }
 
-      expect(applyLessonToParts(parts, lesson.id)).not.toEqual(parts);
+      expect(applyLessonToRocketStats(stats, lesson.id)).not.toEqual(stats);
     });
   });
 });

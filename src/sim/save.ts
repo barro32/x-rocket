@@ -1,10 +1,10 @@
 import { createInitialState } from './game';
 import { defaultLessons } from './lessons';
 import { defaultMetaUpgrades } from './metaUpgrades';
-import { cloneParts, createBaseParts } from './parts';
+import { rebuildRocketStats } from './lessons';
 import type { GameState } from './types';
 
-const saveKey = 'x-rocket-save-v1';
+const saveKey = 'x-rocket-save-v2';
 
 export function loadGame(storage: Storage = window.localStorage): GameState {
   const raw = storage.getItem(saveKey);
@@ -14,20 +14,22 @@ export function loadGame(storage: Storage = window.localStorage): GameState {
 
   try {
     const parsed = JSON.parse(raw) as GameState;
-    if (parsed.version !== 1) {
+    if (parsed.version !== 2) {
       return createInitialState();
     }
+
+    const metaUpgrades = { ...defaultMetaUpgrades, ...parsed.metaUpgrades };
+    const lessons = { ...defaultLessons, ...parsed.lessons };
+
     return {
       ...createInitialState(parsed.seed),
       ...parsed,
-      metaUpgrades: { ...defaultMetaUpgrades, ...parsed.metaUpgrades },
+      metaUpgrades,
       bankruptcyRewardClaimed: parsed.bankruptcyRewardClaimed ?? false,
       safetyReviewUses: parsed.safetyReviewUses ?? 0,
-      lessons: { ...defaultLessons, ...parsed.lessons },
+      lessons,
       pendingLessonChoices: parsed.pendingLessonChoices ?? [],
-      parts: parsed.parts
-        ? cloneParts({ ...createBaseParts({ ...defaultMetaUpgrades, ...parsed.metaUpgrades }), ...parsed.parts })
-        : createBaseParts({ ...defaultMetaUpgrades, ...parsed.metaUpgrades }),
+      rocketStats: rebuildRocketStats(metaUpgrades, lessons),
     };
   } catch {
     return createInitialState();

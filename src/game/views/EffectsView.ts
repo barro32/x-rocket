@@ -1,18 +1,29 @@
 import Phaser from 'phaser';
 
+interface IgnitionEffectConfig {
+  thrust: number;
+  fuel: number;
+}
+
 export class EffectsView {
   constructor(private readonly scene: Phaser.Scene) {}
 
-  ignition(x: number, y: number): void {
-    for (let i = 0; i < 18; i += 1) {
+  ignition(x: number, y: number, config?: IgnitionEffectConfig): void {
+    const thrust = config?.thrust ?? 40;
+    const fuel = config?.fuel ?? 40;
+    const intensity = Math.max(12, Math.round(12 + thrust / 5));
+    const spread = 24 + thrust * 0.45;
+    const length = 42 + fuel * 0.5;
+
+    for (let i = 0; i < intensity; i += 1) {
       const spark = this.scene.add.rectangle(x, y + 10, 4, 4, 0xffc857, 1);
       this.scene.tweens.add({
         targets: spark,
-        x: x + Phaser.Math.Between(-35, 35),
-        y: y + Phaser.Math.Between(28, 72),
+        x: x + Phaser.Math.Between(-spread, spread),
+        y: y + Phaser.Math.Between(28, length),
         alpha: 0,
         scale: 0.2,
-        duration: Phaser.Math.Between(280, 520),
+        duration: Phaser.Math.Between(280, 480 + fuel * 4),
         ease: 'Cubic.easeOut',
         onComplete: () => spark.destroy(),
       });

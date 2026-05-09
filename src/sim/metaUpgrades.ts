@@ -18,7 +18,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['blackBoxRecovery'],
-    unlocks: 'Unlocks Salvage Useful Parts, recovery hardware, and extra explosion salvage.',
+    unlocks: 'Unlocks Salvage Useful Parts and improves failure salvage.',
   },
   {
     id: 'questionableInvestors',
@@ -38,7 +38,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['blackBoxRecovery'],
-    unlocks: 'Unlocks fins and Stabilize the Fins card.',
+    unlocks: 'Permanent guidance boost and unlocks Stabilize the Fins.',
   },
   {
     id: 'recoveryProgram',
@@ -48,7 +48,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['scrapyardEngineering'],
-    unlocks: 'Improves recovery hardware and explosion salvage.',
+    unlocks: 'Greatly improves salvage from failed launches.',
   },
   {
     id: 'supplierContracts',
@@ -108,7 +108,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     costGrowth: 2.15,
     maxLevel: 3,
     prerequisites: ['safetyReviewBoard'],
-    unlocks: 'Exploded launches add +1 lesson choice per level.',
+    unlocks: 'Failed launches add +1 lesson choice per level.',
   },
   {
     id: 'guidanceProgram',
@@ -118,7 +118,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['basicStabilizers'],
-    unlocks: 'Unlocks avionics and Recruit a Specialist card.',
+    unlocks: 'Permanent guidance boost and unlocks Recruit a Specialist.',
   },
   {
     id: 'advancedAerodynamics',
@@ -128,7 +128,7 @@ export const metaUpgradeSpecs: MetaUpgradeSpec[] = [
     costGrowth: 1,
     maxLevel: 1,
     prerequisites: ['basicStabilizers'],
-    unlocks: 'Unlocks nose cone and better upper-atmosphere performance.',
+    unlocks: 'Permanent aerodynamics boost.',
   },
 ];
 
