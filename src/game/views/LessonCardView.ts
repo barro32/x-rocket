@@ -6,6 +6,7 @@ interface LessonCardConfig {
   origin: Phaser.Math.Vector2;
   target: Phaser.Math.Vector2;
   index: number;
+  scale: number;
   onSelect: () => void;
 }
 
@@ -50,7 +51,7 @@ export class LessonCardView {
     });
 
     this.container.add([shadow, this.panel, title, description, effect]);
-    this.container.setScale(0.2);
+    this.container.setScale(config.scale * 0.2);
     this.container.setAlpha(0);
     this.container.setInteractive(
       new Phaser.Geom.Rectangle(-125, -86, 250, 172),
@@ -68,7 +69,7 @@ export class LessonCardView {
         x: this.config.target.x,
         y: this.config.target.y,
         alpha: 1,
-        scale: 1,
+        scale: this.config.scale,
         angle: 0,
         delay: this.config.index * 90,
         duration: 560,
@@ -84,7 +85,7 @@ export class LessonCardView {
       this.scene.tweens.add({
         targets: this.container,
         y: this.container.y - 35,
-        scale: 1.16,
+        scale: this.config.scale * 1.16,
         alpha: 0,
         duration: 260,
         ease: 'Cubic.easeIn',
@@ -116,12 +117,12 @@ export class LessonCardView {
   }
 
   private hover(active: boolean): void {
-    this.scene.tweens.add({
-      targets: this.container,
-      scale: active ? 1.06 : 1,
-      duration: 120,
-      ease: 'Sine.easeOut',
-    });
+      this.scene.tweens.add({
+        targets: this.container,
+        scale: active ? this.config.scale * 1.06 : this.config.scale,
+        duration: 120,
+        ease: 'Sine.easeOut',
+      });
     this.panel.setStrokeStyle(5, active ? 0xff6b35 : 0xf4c95d, 1);
   }
 }

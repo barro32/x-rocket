@@ -26,6 +26,11 @@ export class DevStatsView {
     this.text.setVisible(this.visible);
   }
 
+  layout(width: number, _height: number, zoom: number): void {
+    this.text.setPosition((width - 24) / zoom, 20 / zoom);
+    this.text.setScale(1 / zoom);
+  }
+
   update(state: GameState): void {
     if (!this.visible) {
       return;
