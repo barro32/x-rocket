@@ -1,15 +1,12 @@
 import Phaser from 'phaser';
 import { buyMetaUpgrade, claimBankruptcyReward, chooseLesson, createInitialState, isBankrupt, launchCost, restartCompany, simulateLaunch } from '../sim/game';
-import { lessonById } from '../sim/lessons';
+import { lessonById, lessonEffectText } from '../sim/lessons';
 import { clearSave, loadGame, saveGame } from '../sim/save';
 import type { GameState } from '../sim/types';
+import { DomMetaProgressView } from './views/DomMetaProgressView';
 import { DevStatsView } from './views/DevStatsView';
+import { DomUiView } from './views/DomUiView';
 import { EffectsView } from './views/EffectsView';
-import { GlobalMenuView } from './views/GlobalMenuView';
-import { HudView } from './views/HudView';
-import { LaunchSummaryView } from './views/LaunchSummaryView';
-import { LessonCardView } from './views/LessonCardView';
-import { MetaProgressView } from './views/MetaProgressView';
 import { RocketView } from './views/RocketView';
 import { WorldView } from './views/WorldView';
 
@@ -17,13 +14,10 @@ export class GameScene extends Phaser.Scene {
   private state!: GameState;
   private world!: WorldView;
   private rocket!: RocketView;
-  private hud!: HudView;
-  private globalMenu!: GlobalMenuView;
+  private ui!: DomUiView;
   private devStats!: DevStatsView;
-  private metaProgress!: MetaProgressView;
+  private metaProgress!: DomMetaProgressView;
   private effects!: EffectsView;
-  private activeCards: LessonCardView[] = [];
-  private launchSummary?: LaunchSummaryView;
   private nextLaunchPrep?: Promise<void>;
   private busy = false;
 
@@ -36,14 +30,13 @@ export class GameScene extends Phaser.Scene {
     this.world = new WorldView(this);
     this.rocket = new RocketView(this, this.world.hangarDoor, this.world.launchPad);
     this.effects = new EffectsView(this);
-    this.globalMenu = new GlobalMenuView(this, { onReset: () => this.resetGame() });
-    this.hud = new HudView(this, {
+    this.ui = new DomUiView({
       onPrimary: () => void this.primaryAction(),
       onMeta: () => this.openMetaProgress(),
-      onMenu: () => this.globalMenu.show(),
+      onMenuReset: () => this.resetGame(),
     });
     this.devStats = new DevStatsView(this);
-    this.metaProgress = new MetaProgressView(this, {
+    this.metaProgress = new DomMetaProgressView({
       onBuy: (id) => this.buyMeta(id),
       onContinue: () => void this.startNextCompany(),
     });
@@ -55,7 +48,7 @@ export class GameScene extends Phaser.Scene {
     this.renderState();
 
     if (this.state.pendingLessonChoices.length > 0) {
-      this.showLessonCards(new Phaser.Math.Vector2(this.world.launchPad.x, 300));
+      void this.showLessonCards();
     }
   }
 
@@ -75,7 +68,7 @@ export class GameScene extends Phaser.Scene {
   private async launchSequence(): Promise<void> {
     this.busy = true;
     this.renderState();
-    this.hud.beginLaunchRoll(this.state.rocketStats.reliability);
+    this.ui.beginLaunchRoll(this.state.rocketStats.reliability);
 
     await this.rocket.rolloutToPad();
 
@@ -100,7 +93,7 @@ export class GameScene extends Phaser.Scene {
     };
     const launchRollDuration = this.rocket.ignitionDuration(launchProfile) + this.rocket.flightDuration(result.altitudeMeters, launchProfile);
 
-    this.hud.animateLaunchRoll(result.rolledStats, this.state.rocketStats.reliability, launchRollDuration);
+    this.ui.animateLaunchRoll(result.rolledStats, this.state.rocketStats.reliability, launchRollDuration);
 
     this.effects.ignition(this.world.launchPad.x, this.world.launchPad.y, {
       thrust: result.rolledStats.thrust,
@@ -121,50 +114,30 @@ export class GameScene extends Phaser.Scene {
       this.rocket.fadeAway();
     }
 
-    const cardScreenOrigin = this.worldToScreen(cardOrigin);
     this.resetCamera();
     this.nextLaunchPrep = this.rocket.recycleToPad().finally(() => {
       this.nextLaunchPrep = undefined;
     });
 
-    this.hud.endLaunchRoll(this.state.rocketStats);
+    this.ui.endLaunchRoll(this.state.rocketStats);
     this.persistAndRender();
     await wait(this, 360);
     if (this.state.pendingLessonChoices.length > 0) {
-      await this.showLessonCards(cardScreenOrigin);
+      await this.showLessonCards();
     }
     this.busy = false;
     this.renderState();
   }
 
-  private async showLessonCards(origin: Phaser.Math.Vector2): Promise<void> {
-    this.destroyCards();
-
-    const choices = this.state.pendingLessonChoices;
-    const spacing = choices.length === 4 ? 270 : 285;
-    const startX = 640 - ((choices.length - 1) * spacing) / 2;
-    const targetY = 350;
-
-    this.activeCards = choices.map((lessonId, index) => {
-      const spec = lessonById[lessonId];
-      return new LessonCardView(this, {
-        spec,
-        origin,
-        target: new Phaser.Math.Vector2(startX + index * spacing, targetY),
-        index,
-        onSelect: () => void this.pickLesson(index),
-      });
-    });
-
-    if (this.state.lastLaunch) {
-      this.launchSummary?.container.destroy();
-      this.launchSummary = new LaunchSummaryView(this, this.state.lastLaunch);
-    }
-
-    await Promise.all([
-      this.launchSummary?.enter(),
-      ...this.activeCards.map((card) => card.enter()),
-    ]);
+  private async showLessonCards(): Promise<void> {
+    await this.ui.showLessonChoices(
+      this.state.pendingLessonChoices.map((lessonId) => ({
+        spec: lessonById[lessonId],
+        effectText: lessonEffectText(lessonId, this.state.metaUpgrades, this.state.rocketStats),
+      })),
+      this.state.lastLaunch,
+      (index) => void this.pickLesson(index),
+    );
   }
 
   private async pickLesson(index: number): Promise<void> {
@@ -178,17 +151,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.busy = true;
-    const selectedCard = this.activeCards[index];
-    const otherCards = this.activeCards.filter((_, cardIndex) => cardIndex !== index);
-
-    await Promise.all([
-      this.launchSummary?.exit(),
-      selectedCard?.selectAndDestroy(),
-      ...otherCards.map((card, cardIndex) => card.rejectAndDestroy(cardIndex % 2 === 0 ? -1 : 1)),
-    ]);
-
-    this.activeCards = [];
-    this.launchSummary = undefined;
+    await this.ui.chooseLesson(index);
     this.state = chooseLesson(this.state, lessonId);
     if (this.nextLaunchPrep) {
       await this.nextLaunchPrep;
@@ -243,18 +206,18 @@ export class GameScene extends Phaser.Scene {
     this.effects.floatingText('+1 knowledge', 640, 170, '#8ef6c5');
     if (this.state.pendingLessonChoices.length > 0) {
       await wait(this, 180);
-      await this.showLessonCards(new Phaser.Math.Vector2(this.world.launchPad.x, 300));
+      await this.showLessonCards();
     }
   }
 
   private resetGame(): void {
     clearSave();
-    this.destroyCards();
+    this.ui.destroyLessonChoices();
+    this.ui.hideMenu();
     this.state = createInitialState();
     this.rocket.resetToHangar();
     this.resetCamera();
     this.metaProgress.hide();
-    this.globalMenu.hide();
     this.persistAndRender();
   }
 
@@ -268,29 +231,17 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.pan(640, 360, 220, 'Sine.easeOut');
   }
 
-  private worldToScreen(point: Phaser.Math.Vector2): Phaser.Math.Vector2 {
-    const camera = this.cameras.main;
-    return new Phaser.Math.Vector2(point.x - camera.scrollX, point.y - camera.scrollY);
-  }
-
   private renderState(): void {
     this.world.setCompany(this.state.companyIndex);
-    this.hud.update(
-      this.state.money,
-      launchCost(this.state),
-      isBankrupt(this.state),
-      this.busy || this.state.pendingLessonChoices.length > 0,
-      this.state.rocketStats,
-    );
+    this.ui.update({
+      money: this.state.money,
+      launchCost: launchCost(this.state),
+      bankrupt: isBankrupt(this.state),
+      locked: this.busy || this.state.pendingLessonChoices.length > 0,
+      stats: this.state.rocketStats,
+    });
     this.devStats.update(this.state);
     this.metaProgress.update(this.state);
-  }
-
-  private destroyCards(): void {
-    this.activeCards.forEach((card) => card.container.destroy());
-    this.activeCards = [];
-    this.launchSummary?.container.destroy();
-    this.launchSummary = undefined;
   }
 }
 

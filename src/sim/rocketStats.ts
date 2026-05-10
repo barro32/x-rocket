@@ -5,12 +5,12 @@ export type PerformanceStatId = Exclude<RocketStatId, 'reliability'>;
 export const performanceStatIds: PerformanceStatId[] = ['thrust', 'fuel', 'aerodynamics', 'lightness', 'guidance'];
 
 const baseRocketStats: RocketStats = {
-  thrust: 22,
-  fuel: 24,
-  aerodynamics: 16,
-  lightness: 14,
-  guidance: 12,
-  reliability: 18,
+  thrust: 0,
+  fuel: 0,
+  aerodynamics: 0,
+  lightness: 0,
+  guidance: 0,
+  reliability: 0,
 };
 
 export const orbitScoreThreshold = 280;
@@ -39,6 +39,14 @@ export function improveRocketStat(stats: RocketStats, statId: RocketStatId, amou
 export function rocketScore(stats: Pick<RocketStats, 'thrust' | 'fuel' | 'aerodynamics' | 'lightness' | 'guidance'>): number {
   return stats.thrust * 2.6 + stats.fuel * 2.4 + stats.aerodynamics * 2 + stats.lightness * 2.1 + stats.guidance * 1.5;
 }
+
+export const perfectRocketScore = rocketScore({
+  thrust: 99,
+  fuel: 99,
+  aerodynamics: 99,
+  lightness: 99,
+  guidance: 99,
+});
 
 export function launchVariance(stats: RocketStats): number {
   return Math.max(5, 18 - Math.floor(stats.reliability / 8));

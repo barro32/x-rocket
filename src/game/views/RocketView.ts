@@ -122,6 +122,14 @@ export class RocketView {
 
   async flyTo(altitudeMeters: number, profile: LaunchVisualProfile): Promise<Phaser.Math.Vector2> {
     const visualRise = altitudeToPixels(altitudeMeters);
+    if (visualRise <= 0) {
+      this.stopBurn();
+      this.sprite.setPosition(this.launchPad.x, this.launchPad.y);
+      this.sprite.setAngle(0);
+      this.syncFlamePosition();
+      return new Phaser.Math.Vector2(this.sprite.x, this.sprite.y);
+    }
+
     const targetY = this.launchPad.y - visualRise;
     const horizontalBias = profile.guidance >= profile.aerodynamics ? 1 : -1;
     const driftMagnitude = (1 - profile.guidance / 99) * 90 + (1 - profile.reliability) * 65;
@@ -179,6 +187,10 @@ export class RocketView {
 
   private startBurn(profile: LaunchVisualProfile, ignitionPhase: boolean): void {
     this.stopBurn();
+    if (profile.thrust <= 0 || profile.fuel <= 0) {
+      return;
+    }
+
     const thrustScale = 0.75 + profile.thrust / 90;
     const fuelScale = 0.7 + profile.fuel / 120;
     this.outerFlame.setVisible(true);

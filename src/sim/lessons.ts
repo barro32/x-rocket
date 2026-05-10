@@ -1,6 +1,6 @@
-import { createBaseRocketStats, improveRocketStat } from './rocketStats';
+import { createBaseRocketStats, improveRocketStat, statLabel } from './rocketStats';
 import { defaultMetaUpgrades } from './metaUpgrades';
-import type { GameState, LessonId, LessonSpec, MetaUpgradeId, RocketStats } from './types';
+import type { GameState, LessonId, LessonSpec, MetaUpgradeId, RocketStatId, RocketStats } from './types';
 
 export const lessonSpecs: LessonSpec[] = [
   {
@@ -106,6 +106,89 @@ export function availableLessons(state: GameState): LessonId[] {
     .filter((spec) => state.lessons[spec.id] < spec.maxStacks)
     .filter((spec) => !spec.unlock || state.metaUpgrades[spec.unlock] > 0)
     .map((spec) => spec.id);
+}
+
+export function lessonEffectText(
+  id: LessonId,
+  metaUpgrades: Record<MetaUpgradeId, number> = defaultMetaUpgrades,
+  currentStats?: RocketStats,
+): string {
+  if (currentStats && statChangingLessons.includes(id)) {
+    return formatStatDeltas(currentStats, applyLessonToRocketStats(currentStats, id, metaUpgrades), statOrderForLesson(id));
+  }
+
+  const upgradedTelemetry = metaUpgrades.blackBoxRecovery > 0 ? 2 : 0;
+  const crashLabBonus = metaUpgrades.crashLab;
+  const guidanceBonus = metaUpgrades.guidanceProgram * 2;
+  const aeroBonus = metaUpgrades.advancedAerodynamics * 2;
+  const reviewBonus = Math.min(3, metaUpgrades.failureReviewBoard);
+  const salvagePercent = metaUpgrades.recoveryProgram > 0 ? 10 : 7;
+  const assemblyDiscountPercent = metaUpgrades.supplierContracts > 0 ? 6 : 5;
+
+  switch (id) {
+    case 'reinforceFrame':
+      return `Reliability +${5 + reviewBonus} | Lightness -3`;
+    case 'tuneEngineMix':
+      return `Thrust +${5 + upgradedTelemetry + crashLabBonus} | Reliability -3`;
+    case 'improveFuelFlow':
+      return `Fuel +${5 + upgradedTelemetry + crashLabBonus} | Reliability +1`;
+    case 'salvageUsefulParts':
+      return `Salvage +${salvagePercent}%`;
+    case 'stabilizeFins':
+      return `Guidance +${5 + guidanceBonus} | Aerodynamics +2 | Lightness -2`;
+    case 'fairNoseCone':
+      return `Aerodynamics +${5 + aeroBonus} | Guidance +1`;
+    case 'cutDeadWeight':
+      return `Lightness +${6 + upgradedTelemetry + crashLabBonus} | Reliability -3`;
+    case 'standardizeAssembly':
+      return `Launch cost -${assemblyDiscountPercent}%`;
+    case 'recruitSpecialist':
+      return `Guidance +${7 + metaUpgrades.guidanceProgram} | Reliability +${4 + metaUpgrades.guidanceProgram}`;
+    case 'documentEverything':
+      return 'Bankruptcy knowledge +1';
+  }
+}
+
+const statChangingLessons: LessonId[] = [
+  'reinforceFrame',
+  'tuneEngineMix',
+  'improveFuelFlow',
+  'stabilizeFins',
+  'fairNoseCone',
+  'cutDeadWeight',
+  'recruitSpecialist',
+];
+
+function statOrderForLesson(id: LessonId): RocketStatId[] {
+  switch (id) {
+    case 'reinforceFrame':
+      return ['reliability', 'lightness'];
+    case 'tuneEngineMix':
+      return ['thrust', 'reliability'];
+    case 'improveFuelFlow':
+      return ['fuel', 'reliability'];
+    case 'stabilizeFins':
+      return ['guidance', 'aerodynamics', 'lightness'];
+    case 'fairNoseCone':
+      return ['aerodynamics', 'guidance'];
+    case 'cutDeadWeight':
+      return ['lightness', 'reliability'];
+    case 'recruitSpecialist':
+      return ['guidance', 'reliability'];
+    case 'salvageUsefulParts':
+    case 'standardizeAssembly':
+    case 'documentEverything':
+      return [];
+  }
+}
+
+function formatStatDeltas(before: RocketStats, after: RocketStats, statOrder: RocketStatId[]): string {
+  const deltas = statOrder
+    .map((statId) => ({ statId, delta: after[statId] - before[statId] }))
+    .filter(({ delta }) => delta !== 0)
+    .map(({ statId, delta }) => `${statLabel(statId)} ${delta > 0 ? '+' : ''}${delta}`);
+
+  return deltas.join(' | ') || 'No stat change';
 }
 
 export function applyLessonToRocketStats(

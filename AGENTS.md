@@ -17,7 +17,7 @@ npm run build
 npm audit
 ```
 
-Use Node 25. The repo has `.nvmrc` and `.node-version` pinned to `25`.
+Use Node 24. The repo has `.nvmrc` and `.node-version` pinned to `24`.
 
 ## Architecture
 

@@ -1,7 +1,7 @@
 import { Mulberry32, type Rng } from './rng';
 import { availableLessons, defaultLessons, rebuildRocketStats } from './lessons';
 import { buyMetaUpgrade as buyMetaUpgradeCore, defaultMetaUpgrades, metaUpgradeCost } from './metaUpgrades';
-import { launchVariance, orbitScoreThreshold, performanceStatIds, rocketScore, statLabel, type PerformanceStatId } from './rocketStats';
+import { launchVariance, orbitScoreThreshold, perfectRocketScore, performanceStatIds, rocketScore, statLabel, type PerformanceStatId } from './rocketStats';
 import type {
   FailurePhase,
   GameState,
@@ -13,7 +13,7 @@ import type {
   RolledRocketStats,
 } from './types';
 
-const orbitAltitudeMeters = 100_000;
+const maxLaunchAltitudeMeters = 500_000;
 const startingMoney = 100;
 const restartLoan = 100;
 const baseLaunchCost = 50;
@@ -164,10 +164,10 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
 
   const variance = launchVariance(state.rocketStats);
   const rolledStats = rollLaunchStats(state.rocketStats, rng, variance);
-  const failure = rollFailure(rolledStats, rng);
+  const failure = rollFailure(state.rocketStats, rng);
   const reliability = state.rocketStats.reliability / 99;
   const score = rocketScore(rolledStats);
-  const nominalAltitudeMeters = Math.floor(orbitAltitudeMeters * clamp(score / orbitScoreThreshold, 0.04, 1.15));
+  const nominalAltitudeMeters = Math.floor(maxLaunchAltitudeMeters * clamp(score / perfectRocketScore, 0, 1));
   const altitudeMeters = failure
     ? Math.floor(nominalAltitudeMeters * failure.altitudeFactor)
     : nominalAltitudeMeters;
@@ -185,7 +185,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
 
   if (effectiveFailure?.explodes) {
     outcome = 'exploded';
-  } else if (score >= orbitScoreThreshold) {
+  } else if (!effectiveFailure && score >= orbitScoreThreshold) {
     outcome = 'orbit';
   }
 
@@ -231,21 +231,36 @@ interface FailureResult {
 }
 
 function rollFailure(
-  stats: RolledRocketStats,
+  stats: RocketStats,
   rng: Rng,
 ): FailureResult | undefined {
+  const reliability = stats.reliability / 99;
+  const candidates: Array<{ statId: PerformanceStatId; chance: number }> = [];
+
   for (const statId of performanceStatIds) {
-    if (rng.next() < failureChanceFor(stats[statId])) {
-      return {
-        phase: statId,
-        stat: statId,
-        explodes: true,
-        altitudeFactor: failureAltitudeFactor(statId),
-      };
+    const chance = failureChanceFor(stats[statId], reliability);
+    if (rng.next() < chance) {
+      candidates.push({ statId, chance });
     }
   }
 
-  return undefined;
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.chance, 0);
+  let pick = rng.next() * totalWeight;
+  const selected = candidates.find((candidate) => {
+    pick -= candidate.chance;
+    return pick <= 0;
+  }) ?? candidates[candidates.length - 1];
+
+  return {
+    phase: selected.statId,
+    stat: selected.statId,
+    explodes: true,
+    altitudeFactor: failureAltitudeFactor(selected.statId),
+  };
 }
 
 function launchMessage(
@@ -344,12 +359,18 @@ function rollLaunchStats(
 }
 
 function rollStat(baseValue: number, variance: number, rng: Rng): number {
+  if (baseValue <= 0) {
+    return 0;
+  }
+
   const spread = Math.round((rng.next() * 2 - 1) * variance);
   return clamp(baseValue + spread, 0, 99);
 }
 
-function failureChanceFor(statValue: number): number {
-  return clamp(0.024 - statValue * 0.00019, 0.005, 0.024);
+function failureChanceFor(statValue: number, reliability: number): number {
+  const statChance = clamp(0.024 - statValue * 0.00019, 0.005, 0.024);
+  const reliabilityMultiplier = 1.25 - clamp(reliability, 0, 1) * 0.7;
+  return clamp(statChance * reliabilityMultiplier, 0.003, 0.03);
 }
 
 function failureAltitudeFactor(statId: PerformanceStatId): number {
