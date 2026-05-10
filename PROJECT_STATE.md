@@ -12,7 +12,7 @@ X Rocket is a playable Phaser prototype with an Electron shell. The player launc
 2. Launch costs `$50` before discounts.
 3. Launch resolves from simplified rocket stats.
 4. Launch grants `+1` meta knowledge.
-5. Post-launch lesson cards appear. Early cards are modest; meta upgrades strengthen card effects and draft behavior.
+5. Post-launch lesson cards appear only if the company can afford another launch. Early cards are modest; meta upgrades strengthen card effects and draft behavior.
 6. Player picks one lesson for the current company.
 7. If money is below launch cost, open bankruptcy review.
 8. Spend meta knowledge, then start the next company.
@@ -61,7 +61,7 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 
 - Main HUD is camera-fixed and minimal.
 - Rocket rolls from hangar to pad, launches upward, and the camera follows.
-- Launch summary and cards are camera-fixed overlays.
+- Launch summary and cards are camera-fixed overlays. Lesson cards include compact illustrated headers and separated description/effect areas.
 - Meta upgrades are displayed as an authored compass graph: root centered, economy west, flight east, and review/knowledge south.
 - Meta graph text renders at higher text resolution and opens at 1:1 zoom to avoid blurry scaled labels.
 - Dev stats toggle with `D`.
@@ -70,7 +70,7 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 ## Known Near-Term Work
 
 - Continue tuning meta graph readability, especially branch labels and link colors.
-- Improve card presentation to show upgraded effect values instead of static `+` shorthand.
+- Improve card presentation to show exact upgraded effect values for the current meta state.
 - Add clearer feedback when a meta node is unaffordable or locked.
 - Replace placeholder procedural art with a cohesive pixel art direction.
 - Orbit unlock exists, but orbit gameplay is not implemented.

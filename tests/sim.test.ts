@@ -124,6 +124,17 @@ describe('rocket simulation', () => {
     expect(isBankrupt(afterSecondLaunch)).toBe(true);
   });
 
+  it('does not draft lesson cards when the launch leaves the company bankrupt', () => {
+    const state = {
+      ...createInitialState(1),
+      money: 50,
+    };
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0]));
+
+    expect(isBankrupt(next)).toBe(true);
+    expect(next.pendingLessonChoices).toHaveLength(0);
+  });
+
   it('bad launch stays under 100 meters', () => {
     const state = createInitialState(1);
     const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0]));

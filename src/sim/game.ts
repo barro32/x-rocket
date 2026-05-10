@@ -192,6 +192,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
   const contractPayout = outcome === 'orbit' ? 220 : 0;
   const salvage = calculateSalvage(cost, salvageRateFor(state), outcome);
   const moneyDelta = contractPayout + salvage - cost;
+  const money = state.money + moneyDelta;
   const highestAltitudeMeters = Math.max(state.highestAltitudeMeters, altitudeMeters);
 
   const result: LaunchResult = {
@@ -208,13 +209,13 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
 
   return {
     ...state,
-    money: state.money + moneyDelta,
+    money,
     knowledge: state.knowledge + 1,
     launches: state.launches + 1,
     highestAltitudeMeters,
     safetyReviewUses,
     lastLaunch: result,
-    pendingLessonChoices: draftLessonChoices(state, rng, outcome, effectiveFailure?.stat),
+    pendingLessonChoices: money >= launchCost({ ...state, money }) ? draftLessonChoices(state, rng, outcome, effectiveFailure?.stat) : [],
     unlockedLayers: {
       ...state.unlockedLayers,
       orbit: state.unlockedLayers.orbit || outcome === 'orbit',

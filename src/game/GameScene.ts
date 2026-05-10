@@ -130,7 +130,9 @@ export class GameScene extends Phaser.Scene {
     this.hud.endLaunchRoll(this.state.rocketStats);
     this.persistAndRender();
     await wait(this, 360);
-    await this.showLessonCards(cardScreenOrigin);
+    if (this.state.pendingLessonChoices.length > 0) {
+      await this.showLessonCards(cardScreenOrigin);
+    }
     this.busy = false;
     this.renderState();
   }
