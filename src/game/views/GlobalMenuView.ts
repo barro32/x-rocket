@@ -6,50 +6,72 @@ interface GlobalMenuViewConfig {
 
 export class GlobalMenuView {
   private readonly container: Phaser.GameObjects.Container;
+  private readonly blocker: Phaser.GameObjects.Rectangle;
+  private readonly panel: Phaser.GameObjects.Rectangle;
+  private readonly title: Phaser.GameObjects.Text;
+  private readonly resetButton: Phaser.GameObjects.Text;
+  private readonly closeButton: Phaser.GameObjects.Text;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly config: GlobalMenuViewConfig,
   ) {
-    this.container = scene.add.container(640, 360).setDepth(80).setVisible(false).setAlpha(0);
+    this.container = scene.add.container(scene.scale.width / 2, scene.scale.height / 2).setDepth(80).setVisible(false).setAlpha(0);
     this.container.setScrollFactor(0);
 
-    const blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.72);
-    blocker.setInteractive();
+    this.blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.72);
+    this.blocker.setInteractive();
 
-    const panel = scene.add.rectangle(0, 0, 420, 260, 0x101828, 0.96);
-    panel.setStrokeStyle(4, 0xf4c95d, 1);
+    this.panel = scene.add.rectangle(0, 0, 420, 260, 0x101828, 0.96);
+    this.panel.setStrokeStyle(4, 0xf4c95d, 1);
 
-    const title = scene.add.text(0, -92, 'MENU', {
+    this.title = scene.add.text(0, -92, 'MENU', {
       fontFamily: 'monospace',
       fontSize: '34px',
       color: '#f6e7c7',
     });
-    title.setOrigin(0.5);
+    this.title.setOrigin(0.5);
 
-    const resetButton = scene.add.text(0, -10, 'Reset Game', {
+    this.resetButton = scene.add.text(0, -10, 'Reset Game', {
       fontFamily: 'monospace',
       fontSize: '24px',
       color: '#101828',
       backgroundColor: '#ff6b35',
       padding: { x: 22, y: 12 },
     });
-    resetButton.setOrigin(0.5);
-    resetButton.setInteractive({ useHandCursor: true });
-    resetButton.on('pointerdown', () => this.config.onReset());
+    this.resetButton.setOrigin(0.5);
+    this.resetButton.setInteractive({ useHandCursor: true });
+    this.resetButton.on('pointerdown', () => this.config.onReset());
 
-    const closeButton = scene.add.text(0, 74, 'Close', {
+    this.closeButton = scene.add.text(0, 74, 'Close', {
       fontFamily: 'monospace',
       fontSize: '20px',
       color: '#101828',
       backgroundColor: '#f6e7c7',
       padding: { x: 20, y: 10 },
     });
-    closeButton.setOrigin(0.5);
-    closeButton.setInteractive({ useHandCursor: true });
-    closeButton.on('pointerdown', () => this.hide());
+    this.closeButton.setOrigin(0.5);
+    this.closeButton.setInteractive({ useHandCursor: true });
+    this.closeButton.on('pointerdown', () => this.hide());
 
-    this.container.add([blocker, panel, title, resetButton, closeButton]);
+    this.container.add([this.blocker, this.panel, this.title, this.resetButton, this.closeButton]);
+    this.layout(scene.scale.width, scene.scale.height);
+  }
+
+  layout(width: number, height: number): void {
+    const compact = width < 640;
+    const panelWidth = Math.min(420, Math.max(300, width - 32));
+    const panelHeight = compact ? 240 : 260;
+
+    this.container.setPosition(width / 2, height / 2);
+    this.blocker.setSize(width, height);
+    this.panel.setSize(panelWidth, panelHeight);
+    this.title.setPosition(0, compact ? -78 : -92);
+    this.title.setStyle({ fontSize: compact ? '28px' : '34px' });
+    this.resetButton.setPosition(0, compact ? -4 : -10);
+    this.resetButton.setStyle({ fontSize: compact ? '20px' : '24px', padding: { x: compact ? 18 : 22, y: compact ? 10 : 12 } });
+    this.closeButton.setPosition(0, compact ? 68 : 74);
+    this.closeButton.setStyle({ fontSize: compact ? '18px' : '20px', padding: { x: compact ? 16 : 20, y: compact ? 8 : 10 } });
   }
 
   show(): void {

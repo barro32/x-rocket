@@ -15,6 +15,8 @@ export class HudView {
   private menuButton: Phaser.GameObjects.Text;
   private launchRollTween?: Phaser.Tweens.Tween;
   private launchRollActive = false;
+  private viewportWidth = 1280;
+  private viewportHeight = 720;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -87,6 +89,37 @@ export class HudView {
     this.menuButton.setDepth(40);
     this.menuButton.setInteractive({ useHandCursor: true });
     this.menuButton.on('pointerdown', config.onMenu);
+
+    this.layout(scene.scale.width, scene.scale.height);
+  }
+
+  layout(width: number, height: number): void {
+    this.viewportWidth = width;
+    this.viewportHeight = height;
+
+    const compact = width < 900;
+    const narrow = width < 560;
+    const topY = 16;
+    const sidePadding = narrow ? 14 : 20;
+    const buttonFont = narrow ? '14px' : compact ? '15px' : '16px';
+    const moneyFont = narrow ? '20px' : compact ? '24px' : '28px';
+    const statsFont = narrow ? '12px' : compact ? '13px' : '15px';
+    const primaryFont = narrow ? '18px' : compact ? '20px' : '24px';
+
+    this.moneyText.setPosition(sidePadding, topY);
+    this.moneyText.setStyle({ fontSize: moneyFont, padding: { x: narrow ? 10 : 14, y: narrow ? 6 : 8 } });
+
+    this.menuButton.setPosition(width - sidePadding, topY);
+    this.menuButton.setStyle({ fontSize: buttonFont, padding: { x: narrow ? 8 : 10, y: narrow ? 6 : 7 } });
+
+    this.metaButton.setPosition(this.menuButton.x - this.menuButton.width - 10, topY);
+    this.metaButton.setStyle({ fontSize: buttonFont, padding: { x: narrow ? 8 : 10, y: narrow ? 6 : 7 } });
+
+    this.statsText.setPosition(width / 2, compact ? 62 : 24);
+    this.statsText.setStyle({ fontSize: statsFont, padding: { x: narrow ? 8 : 12, y: narrow ? 6 : 8 } });
+
+    this.primaryButton.setPosition(width / 2, height - (compact ? 38 : 60));
+    this.primaryButton.setStyle({ fontSize: primaryFont, padding: { x: narrow ? 16 : 22, y: narrow ? 10 : 12 } });
   }
 
   update(money: number, launchCost: number, bankrupt: boolean, locked: boolean, stats: RocketStats): void {
@@ -137,14 +170,25 @@ export class HudView {
   }
 
   private renderStats(stats: RocketStats): void {
-    this.statsText.setText(
-      `THR ${stats.thrust}  FUEL ${stats.fuel}  AERO ${stats.aerodynamics}  LIGHT ${stats.lightness}  GUIDE ${stats.guidance}  REL ${stats.reliability}`,
-    );
+    this.statsText.setText(this.formatStatsText(stats.thrust, stats.fuel, stats.aerodynamics, stats.lightness, stats.guidance, stats.reliability));
   }
 
   private renderRolledStats(rolledStats: RolledRocketStats, reliability: number): void {
     this.statsText.setText(
-      `THR ${rolledStats.thrust}  FUEL ${rolledStats.fuel}  AERO ${rolledStats.aerodynamics}  LIGHT ${rolledStats.lightness}  GUIDE ${rolledStats.guidance}  REL ${reliability}`,
+      this.formatStatsText(
+        rolledStats.thrust,
+        rolledStats.fuel,
+        rolledStats.aerodynamics,
+        rolledStats.lightness,
+        rolledStats.guidance,
+        reliability,
+      ),
     );
+  }
+
+  private formatStatsText(thrust: number, fuel: number, aerodynamics: number, lightness: number, guidance: number, reliability: number): string {
+    const firstLine = `THR ${thrust}  FUEL ${fuel}  AERO ${aerodynamics}`;
+    const secondLine = `LIGHT ${lightness}  GUIDE ${guidance}  REL ${reliability}`;
+    return this.viewportWidth < 900 ? `${firstLine}\n${secondLine}` : `${firstLine}  ${secondLine}`;
   }
 }

@@ -5,6 +5,7 @@ interface LessonCardConfig {
   spec: LessonSpec;
   origin: Phaser.Math.Vector2;
   target: Phaser.Math.Vector2;
+  scale: number;
   index: number;
   onSelect: () => void;
 }
@@ -13,11 +14,13 @@ export class LessonCardView {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly panel: Phaser.GameObjects.Rectangle;
+  private targetScale: number;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly config: LessonCardConfig,
   ) {
+    this.targetScale = config.scale;
     this.container = scene.add.container(config.origin.x, config.origin.y);
     this.container.setDepth(20);
     this.container.setScrollFactor(0);
@@ -68,7 +71,7 @@ export class LessonCardView {
         x: this.config.target.x,
         y: this.config.target.y,
         alpha: 1,
-        scale: 1,
+        scale: this.targetScale,
         angle: 0,
         delay: this.config.index * 90,
         duration: 560,
@@ -84,7 +87,7 @@ export class LessonCardView {
       this.scene.tweens.add({
         targets: this.container,
         y: this.container.y - 35,
-        scale: 1.16,
+        scale: this.targetScale * 1.16,
         alpha: 0,
         duration: 260,
         ease: 'Cubic.easeIn',
@@ -101,7 +104,7 @@ export class LessonCardView {
     return new Promise((resolve) => {
       this.scene.tweens.add({
         targets: this.container,
-        x: this.container.x + direction * 260,
+        x: this.container.x + direction * 260 * this.targetScale,
         y: this.container.y + 80,
         angle: direction * 18,
         alpha: 0,
@@ -115,10 +118,30 @@ export class LessonCardView {
     });
   }
 
+  layout(target: Phaser.Math.Vector2, scale: number, duration = 180): void {
+    this.targetScale = scale;
+    this.config.target = target;
+
+    if (duration <= 0) {
+      this.container.setPosition(target.x, target.y);
+      this.container.setScale(scale);
+      return;
+    }
+
+    this.scene.tweens.add({
+      targets: this.container,
+      x: target.x,
+      y: target.y,
+      scale,
+      duration,
+      ease: 'Sine.easeOut',
+    });
+  }
+
   private hover(active: boolean): void {
     this.scene.tweens.add({
       targets: this.container,
-      scale: active ? 1.06 : 1,
+      scale: active ? this.targetScale * 1.06 : this.targetScale,
       duration: 120,
       ease: 'Sine.easeOut',
     });

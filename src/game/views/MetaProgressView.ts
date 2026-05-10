@@ -40,21 +40,24 @@ const nodePositions: Record<MetaUpgradeId, { x: number; y: number }> = {
 };
 
 export class MetaProgressView {
-  private static readonly viewportCenterX = 0;
-  private static readonly viewportCenterY = 18;
-  private static readonly viewportWidth = 960;
-  private static readonly viewportHeight = 478;
   private static readonly minZoom = 0.7;
   private static readonly maxZoom = 1.5;
   private static readonly zoomStep = 0.1;
 
   private readonly container: Phaser.GameObjects.Container;
+  private readonly blocker: Phaser.GameObjects.Rectangle;
+  private readonly panel: Phaser.GameObjects.Rectangle;
+  private readonly titleText: Phaser.GameObjects.Text;
   private readonly knowledgeText: Phaser.GameObjects.Text;
   private readonly navHintText: Phaser.GameObjects.Text;
+  private readonly viewportBackground: Phaser.GameObjects.Rectangle;
+  private readonly viewportMask: Phaser.GameObjects.Graphics;
   private readonly treeContainer: Phaser.GameObjects.Container;
   private readonly graph: Phaser.GameObjects.Graphics;
   private readonly nodes: MetaNode[] = [];
   private readonly continueButton: Phaser.GameObjects.Text;
+  private readonly zoomInButton: Phaser.GameObjects.Text;
+  private readonly zoomOutButton: Phaser.GameObjects.Text;
   private readonly tooltipContainer: Phaser.GameObjects.Container;
   private readonly tooltipBackground: Phaser.GameObjects.Rectangle;
   private readonly tooltipText: Phaser.GameObjects.Text;
@@ -71,27 +74,33 @@ export class MetaProgressView {
   private panOffsetX = 0;
   private panOffsetY = -115;
   private treeZoom = 1;
+  private panelWidth = 1040;
+  private panelHeight = 650;
+  private viewportCenterX = 0;
+  private viewportCenterY = 18;
+  private viewportWidth = 960;
+  private viewportHeight = 478;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly config: MetaProgressViewConfig,
   ) {
-    this.container = scene.add.container(640, 360).setDepth(60).setVisible(false).setAlpha(0);
+    this.container = scene.add.container(scene.scale.width / 2, scene.scale.height / 2).setDepth(60).setVisible(false).setAlpha(0);
     this.container.setScrollFactor(0);
     this.treeBounds = this.calculateTreeBounds();
 
-    const blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.78);
-    blocker.setInteractive();
-    const panel = scene.add.rectangle(0, 0, 1040, 650, 0x101828, 0.96);
-    panel.setStrokeStyle(5, 0xf4c95d, 1);
-    panel.setInteractive();
+    this.blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.78);
+    this.blocker.setInteractive();
+    this.panel = scene.add.rectangle(0, 0, 1040, 650, 0x101828, 0.96);
+    this.panel.setStrokeStyle(5, 0xf4c95d, 1);
+    this.panel.setInteractive();
 
-    const title = scene.add.text(-470, -298, 'BANKRUPTCY REVIEW', {
+    this.titleText = scene.add.text(-470, -298, 'BANKRUPTCY REVIEW', {
       fontFamily: 'monospace',
       fontSize: '32px',
       color: '#f6e7c7',
     });
-    title.setResolution(2);
+    this.titleText.setResolution(2);
 
     this.knowledgeText = scene.add.text(-470, -254, '', {
       fontFamily: 'monospace',
@@ -108,32 +117,34 @@ export class MetaProgressView {
     this.navHintText.setOrigin(1, 0);
     this.navHintText.setResolution(2);
 
-    const viewportBackground = scene.add.rectangle(
-      MetaProgressView.viewportCenterX,
-      MetaProgressView.viewportCenterY,
-      MetaProgressView.viewportWidth,
-      MetaProgressView.viewportHeight,
+    this.viewportBackground = scene.add.rectangle(
+      this.viewportCenterX,
+      this.viewportCenterY,
+      this.viewportWidth,
+      this.viewportHeight,
       0x0b1320,
       0.8,
     );
-    viewportBackground.setStrokeStyle(2, 0x2f3b54, 1);
+    this.viewportBackground.setStrokeStyle(2, 0x2f3b54, 1);
 
-    const viewportMask = scene.add.graphics();
-    viewportMask.fillStyle(0xffffff, 1);
-    viewportMask.fillRect(
-      MetaProgressView.viewportCenterX - MetaProgressView.viewportWidth / 2,
-      MetaProgressView.viewportCenterY - MetaProgressView.viewportHeight / 2,
-      MetaProgressView.viewportWidth,
-      MetaProgressView.viewportHeight,
-    );
-    viewportMask.setVisible(false);
+    this.viewportMask = scene.add.graphics();
+    this.viewportMask.setVisible(false);
 
-    this.treeContainer = scene.add.container(MetaProgressView.viewportCenterX, MetaProgressView.viewportCenterY);
-    this.treeContainer.setMask(viewportMask.createGeometryMask());
+    this.treeContainer = scene.add.container(this.viewportCenterX, this.viewportCenterY);
+    this.treeContainer.setMask(this.viewportMask.createGeometryMask());
 
     this.graph = scene.add.graphics();
     this.treeContainer.add(this.graph);
-    this.container.add([blocker, panel, title, this.knowledgeText, this.navHintText, viewportBackground, this.treeContainer]);
+    this.container.add([
+      this.blocker,
+      this.panel,
+      this.titleText,
+      this.knowledgeText,
+      this.navHintText,
+      this.viewportBackground,
+      this.treeContainer,
+      this.viewportMask,
+    ]);
 
     metaUpgradeSpecs.forEach((spec) => {
       const position = nodePositions[spec.id];
@@ -179,6 +190,31 @@ export class MetaProgressView {
     this.continueButton.on('pointerout', () => this.continueButton.setScale(1));
     this.container.add(this.continueButton);
 
+    this.zoomInButton = scene.add.text(0, 0, '+', {
+      fontFamily: 'monospace',
+      fontSize: '22px',
+      color: '#101828',
+      backgroundColor: '#f6e7c7',
+      padding: { x: 12, y: 6 },
+    });
+    this.zoomInButton.setOrigin(0.5);
+    this.zoomInButton.setResolution(2);
+    this.zoomInButton.setInteractive({ useHandCursor: true });
+    this.zoomInButton.on('pointerdown', () => this.adjustZoom(1));
+
+    this.zoomOutButton = scene.add.text(0, 0, '-', {
+      fontFamily: 'monospace',
+      fontSize: '22px',
+      color: '#101828',
+      backgroundColor: '#f6e7c7',
+      padding: { x: 14, y: 6 },
+    });
+    this.zoomOutButton.setOrigin(0.5);
+    this.zoomOutButton.setResolution(2);
+    this.zoomOutButton.setInteractive({ useHandCursor: true });
+    this.zoomOutButton.on('pointerdown', () => this.adjustZoom(-1));
+    this.container.add([this.zoomInButton, this.zoomOutButton]);
+
     this.tooltipBackground = scene.add.rectangle(0, 0, 260, 120, 0x0b1320, 0.96);
     this.tooltipBackground.setStrokeStyle(2, 0xf4c95d, 1);
     this.tooltipBackground.setOrigin(0, 0);
@@ -200,6 +236,51 @@ export class MetaProgressView {
     scene.input.on('wheel', (pointer: Phaser.Input.Pointer, _targets: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
       this.handleWheelZoom(pointer, dy);
     });
+
+    this.layout(scene.scale.width, scene.scale.height);
+    this.applyTreeTransform();
+  }
+
+  layout(width: number, height: number): void {
+    const compact = width < 900 || height < 760;
+    const narrow = width < 560;
+
+    this.panelWidth = Math.max(320, width - 28);
+    this.panelHeight = Math.max(460, height - 28);
+    this.viewportWidth = this.panelWidth - (narrow ? 28 : 80);
+    this.viewportHeight = this.panelHeight - (narrow ? 196 : 172);
+    this.viewportCenterX = 0;
+    this.viewportCenterY = narrow ? 24 : 18;
+
+    this.container.setPosition(width / 2, height / 2);
+    this.blocker.setSize(width, height);
+    this.panel.setSize(this.panelWidth, this.panelHeight);
+
+    const left = -(this.panelWidth / 2) + 18;
+    const right = (this.panelWidth / 2) - 18;
+    const top = -(this.panelHeight / 2) + 16;
+    const bottom = (this.panelHeight / 2) - 18;
+
+    this.titleText.setPosition(left, top);
+    this.titleText.setStyle({ fontSize: compact ? '26px' : '32px' });
+    this.knowledgeText.setPosition(left, top + (compact ? 34 : 44));
+    this.knowledgeText.setStyle({ fontSize: compact ? '16px' : '19px' });
+    this.navHintText.setPosition(right, top + (compact ? 36 : 44));
+    this.navHintText.setStyle({ fontSize: narrow ? '12px' : '14px' });
+    this.navHintText.setText(narrow ? 'Drag to pan | +/- to zoom' : 'Drag to pan | Wheel or +/- to zoom');
+
+    this.viewportBackground.setPosition(this.viewportCenterX, this.viewportCenterY);
+    this.viewportBackground.setSize(this.viewportWidth, this.viewportHeight);
+    this.redrawViewportMask();
+
+    this.continueButton.setPosition(0, bottom - 18);
+    this.continueButton.setStyle({ fontSize: compact ? '18px' : '22px', padding: { x: compact ? 18 : 22, y: compact ? 8 : 10 } });
+
+    const zoomButtonY = this.viewportCenterY - this.viewportHeight / 2 + 24;
+    this.zoomInButton.setPosition(right - 24, zoomButtonY);
+    this.zoomOutButton.setPosition(right - 24, zoomButtonY + 48);
+    this.zoomInButton.setStyle({ fontSize: compact ? '18px' : '22px' });
+    this.zoomOutButton.setStyle({ fontSize: compact ? '18px' : '22px' });
 
     this.applyTreeTransform();
   }
@@ -315,8 +396,8 @@ export class MetaProgressView {
     }
 
     const local = this.toLocalPoint(pointer);
-    const viewX = local.x - MetaProgressView.viewportCenterX;
-    const viewY = local.y - MetaProgressView.viewportCenterY;
+    const viewX = local.x - this.viewportCenterX;
+    const viewY = local.y - this.viewportCenterY;
 
     const nextZoom = Phaser.Math.Clamp(
       this.treeZoom + (deltaY > 0 ? -MetaProgressView.zoomStep : MetaProgressView.zoomStep),
@@ -341,18 +422,18 @@ export class MetaProgressView {
     this.panOffsetX = clamped.x;
     this.panOffsetY = clamped.y;
     this.treeContainer.setPosition(
-      MetaProgressView.viewportCenterX + this.panOffsetX,
-      MetaProgressView.viewportCenterY + this.panOffsetY,
+      this.viewportCenterX + this.panOffsetX,
+      this.viewportCenterY + this.panOffsetY,
     );
     this.treeContainer.setScale(this.treeZoom);
   }
 
   private clampPan(x: number, y: number, zoom: number): { x: number; y: number } {
     const margin = 80;
-    const viewportLeft = MetaProgressView.viewportCenterX - MetaProgressView.viewportWidth / 2;
-    const viewportRight = MetaProgressView.viewportCenterX + MetaProgressView.viewportWidth / 2;
-    const viewportTop = MetaProgressView.viewportCenterY - MetaProgressView.viewportHeight / 2;
-    const viewportBottom = MetaProgressView.viewportCenterY + MetaProgressView.viewportHeight / 2;
+    const viewportLeft = this.viewportCenterX - this.viewportWidth / 2;
+    const viewportRight = this.viewportCenterX + this.viewportWidth / 2;
+    const viewportTop = this.viewportCenterY - this.viewportHeight / 2;
+    const viewportBottom = this.viewportCenterY + this.viewportHeight / 2;
 
     const minX = viewportRight - this.treeBounds.right * zoom - margin;
     const maxX = viewportLeft - this.treeBounds.left * zoom + margin;
@@ -424,10 +505,10 @@ export class MetaProgressView {
     const local = this.toLocalPoint(pointer);
     const tooltipWidth = this.tooltipBackground.width;
     const tooltipHeight = this.tooltipBackground.height;
-    const minX = -515;
-    const maxX = 515 - tooltipWidth;
-    const minY = -315;
-    const maxY = 315 - tooltipHeight;
+    const minX = -(this.panelWidth / 2) + 10;
+    const maxX = (this.panelWidth / 2) - 10 - tooltipWidth;
+    const minY = -(this.panelHeight / 2) + 10;
+    const maxY = (this.panelHeight / 2) - 10 - tooltipHeight;
 
     const x = Phaser.Math.Clamp(local.x + 18, minX, maxX);
     const y = Phaser.Math.Clamp(local.y + 18, minY, maxY);
@@ -443,11 +524,37 @@ export class MetaProgressView {
 
   private isPointerInsideViewport(pointer: Phaser.Input.Pointer): boolean {
     const local = this.toLocalPoint(pointer);
-    const left = MetaProgressView.viewportCenterX - MetaProgressView.viewportWidth / 2;
-    const right = MetaProgressView.viewportCenterX + MetaProgressView.viewportWidth / 2;
-    const top = MetaProgressView.viewportCenterY - MetaProgressView.viewportHeight / 2;
-    const bottom = MetaProgressView.viewportCenterY + MetaProgressView.viewportHeight / 2;
+    const left = this.viewportCenterX - this.viewportWidth / 2;
+    const right = this.viewportCenterX + this.viewportWidth / 2;
+    const top = this.viewportCenterY - this.viewportHeight / 2;
+    const bottom = this.viewportCenterY + this.viewportHeight / 2;
     return local.x >= left && local.x <= right && local.y >= top && local.y <= bottom;
+  }
+
+  private redrawViewportMask(): void {
+    this.viewportMask.clear();
+    this.viewportMask.fillStyle(0xffffff, 1);
+    this.viewportMask.fillRect(
+      this.viewportCenterX - this.viewportWidth / 2,
+      this.viewportCenterY - this.viewportHeight / 2,
+      this.viewportWidth,
+      this.viewportHeight,
+    );
+  }
+
+  private adjustZoom(direction: number): void {
+    const nextZoom = Phaser.Math.Clamp(
+      this.treeZoom + direction * MetaProgressView.zoomStep,
+      MetaProgressView.minZoom,
+      MetaProgressView.maxZoom,
+    );
+
+    if (Math.abs(nextZoom - this.treeZoom) < 0.0001) {
+      return;
+    }
+
+    this.treeZoom = nextZoom;
+    this.applyTreeTransform();
   }
 
   private drawLinks(state: GameState): void {

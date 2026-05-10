@@ -19,6 +19,13 @@ export class DevStatsView {
     this.text.setScrollFactor(0);
     this.text.setDepth(30);
     this.text.setVisible(false);
+    this.layout(scene.scale.width);
+  }
+
+  layout(width: number): void {
+    const compact = width < 900;
+    this.text.setPosition(width - 16, compact ? 72 : 24);
+    this.text.setStyle({ fontSize: compact ? '11px' : '13px' });
   }
 
   toggle(): void {

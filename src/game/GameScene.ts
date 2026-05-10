@@ -14,6 +14,9 @@ import { RocketView } from './views/RocketView';
 import { WorldView } from './views/WorldView';
 
 export class GameScene extends Phaser.Scene {
+  private static readonly baseWidth = 1280;
+  private static readonly baseHeight = 720;
+
   private state!: GameState;
   private world!: WorldView;
   private rocket!: RocketView;
@@ -49,13 +52,15 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.rocket.resetToHangar();
-    this.cameras.main.setBounds(0, -3200, 1280, 3920);
+    this.cameras.main.setBounds(0, -3200, GameScene.baseWidth, 3920);
     this.resetCamera();
+    this.scale.on('resize', this.handleResize, this);
     this.input.keyboard?.on('keydown-D', () => this.devStats.toggle());
+    this.handleResize(this.scale.gameSize);
     this.renderState();
 
     if (this.state.pendingLessonChoices.length > 0) {
-      this.showLessonCards(new Phaser.Math.Vector2(this.world.launchPad.x, 300));
+      this.showLessonCards(this.defaultCardOrigin());
     }
   }
 
@@ -139,16 +144,15 @@ export class GameScene extends Phaser.Scene {
     this.destroyCards();
 
     const choices = this.state.pendingLessonChoices;
-    const spacing = choices.length === 4 ? 270 : 285;
-    const startX = 640 - ((choices.length - 1) * spacing) / 2;
-    const targetY = 350;
+    const cardLayout = this.calculateLessonLayout(choices.length);
 
     this.activeCards = choices.map((lessonId, index) => {
       const spec = lessonById[lessonId];
       return new LessonCardView(this, {
         spec,
         origin,
-        target: new Phaser.Math.Vector2(startX + index * spacing, targetY),
+        target: cardLayout.targets[index],
+        scale: cardLayout.scale,
         index,
         onSelect: () => void this.pickLesson(index),
       });
@@ -158,6 +162,8 @@ export class GameScene extends Phaser.Scene {
       this.launchSummary?.container.destroy();
       this.launchSummary = new LaunchSummaryView(this, this.state.lastLaunch);
     }
+
+    this.layoutActiveCards(false);
 
     await Promise.all([
       this.launchSummary?.enter(),
@@ -241,7 +247,7 @@ export class GameScene extends Phaser.Scene {
     this.effects.floatingText('+1 knowledge', 640, 170, '#8ef6c5');
     if (this.state.pendingLessonChoices.length > 0) {
       await wait(this, 180);
-      await this.showLessonCards(new Phaser.Math.Vector2(this.world.launchPad.x, 300));
+      await this.showLessonCards(this.defaultCardOrigin());
     }
   }
 
@@ -268,7 +274,83 @@ export class GameScene extends Phaser.Scene {
 
   private worldToScreen(point: Phaser.Math.Vector2): Phaser.Math.Vector2 {
     const camera = this.cameras.main;
-    return new Phaser.Math.Vector2(point.x - camera.scrollX, point.y - camera.scrollY);
+    return new Phaser.Math.Vector2(
+      (point.x - camera.scrollX) * camera.zoom,
+      (point.y - camera.scrollY) * camera.zoom,
+    );
+  }
+
+  private handleResize(gameSize: Phaser.Structs.Size): void {
+    const width = gameSize.width;
+    const height = gameSize.height;
+    const zoom = Math.min(width / GameScene.baseWidth, height / GameScene.baseHeight);
+
+    this.cameras.main.setViewport(0, 0, width, height);
+    this.cameras.main.setZoom(zoom);
+
+    this.hud.layout(width, height);
+    this.globalMenu.layout(width, height);
+    this.devStats.layout(width);
+    this.metaProgress.layout(width, height);
+    this.launchSummary?.layout(width, height);
+    this.layoutActiveCards();
+  }
+
+  private layoutActiveCards(animate = true): void {
+    if (this.activeCards.length === 0) {
+      return;
+    }
+
+    const cardLayout = this.calculateLessonLayout(this.activeCards.length);
+    this.activeCards.forEach((card, index) => {
+      card.layout(cardLayout.targets[index], cardLayout.scale, animate ? 180 : 0);
+    });
+    this.launchSummary?.layout(this.scale.width, this.scale.height);
+  }
+
+  private defaultCardOrigin(): Phaser.Math.Vector2 {
+    return new Phaser.Math.Vector2(this.scale.width / 2, Math.min(this.scale.height * 0.42, 300));
+  }
+
+  private calculateLessonLayout(count: number): { scale: number; targets: Phaser.Math.Vector2[] } {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const compact = width < 760;
+
+    if (!compact) {
+      const spacing = count === 4 ? 270 : 285;
+      const startX = width / 2 - ((count - 1) * spacing) / 2;
+      const targetY = Math.min(height - 170, 350);
+      return {
+        scale: 1,
+        targets: Array.from({ length: count }, (_, index) => new Phaser.Math.Vector2(startX + index * spacing, targetY)),
+      };
+    }
+
+    const columns = count <= 2 ? 1 : 2;
+    const rows = Math.ceil(count / columns);
+    const horizontalGap = 18;
+    const verticalGap = 18;
+    const scale = Phaser.Math.Clamp(
+      (width - 36 - (columns - 1) * horizontalGap) / (columns * 250),
+      0.58,
+      0.82,
+    );
+    const cardWidth = 250 * scale;
+    const cardHeight = 172 * scale;
+    const startY = Math.max(220, height - rows * cardHeight - (rows - 1) * verticalGap - 120);
+
+    const targets: Phaser.Math.Vector2[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const row = Math.floor(index / columns);
+      const column = index % columns;
+      const itemsInRow = row === rows - 1 && count % columns !== 0 ? count % columns : columns;
+      const rowWidth = itemsInRow * cardWidth + (itemsInRow - 1) * horizontalGap;
+      const startX = width / 2 - rowWidth / 2 + cardWidth / 2;
+      targets.push(new Phaser.Math.Vector2(startX + column * (cardWidth + horizontalGap), startY + row * (cardHeight + verticalGap)));
+    }
+
+    return { scale, targets };
   }
 
   private renderState(): void {
