@@ -42,15 +42,16 @@ const nodePositions: Record<MetaUpgradeId, { x: number; y: number }> = {
 export class MetaProgressView {
   private static readonly viewportCenterX = 0;
   private static readonly viewportCenterY = 18;
-  private static readonly viewportWidth = 960;
-  private static readonly viewportHeight = 478;
   private static readonly minZoom = 0.7;
   private static readonly maxZoom = 1.5;
   private static readonly zoomStep = 0.1;
 
   private readonly container: Phaser.GameObjects.Container;
+  private readonly blocker: Phaser.GameObjects.Rectangle;
   private readonly knowledgeText: Phaser.GameObjects.Text;
   private readonly navHintText: Phaser.GameObjects.Text;
+  private readonly viewportBackground: Phaser.GameObjects.Rectangle;
+  private readonly viewportMask: Phaser.GameObjects.Graphics;
   private readonly treeContainer: Phaser.GameObjects.Container;
   private readonly graph: Phaser.GameObjects.Graphics;
   private readonly nodes: MetaNode[] = [];
@@ -71,6 +72,12 @@ export class MetaProgressView {
   private panOffsetX = 0;
   private panOffsetY = -115;
   private treeZoom = 1;
+  private containerScale = 1;
+  private screenScale = 1;
+  private screenCenterX = 640;
+  private screenCenterY = 360;
+  private viewportWidth = 960;
+  private viewportHeight = 478;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -80,8 +87,8 @@ export class MetaProgressView {
     this.container.setScrollFactor(0);
     this.treeBounds = this.calculateTreeBounds();
 
-    const blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.78);
-    blocker.setInteractive();
+    this.blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.78);
+    this.blocker.setInteractive();
     const panel = scene.add.rectangle(0, 0, 1040, 650, 0x101828, 0.96);
     panel.setStrokeStyle(5, 0xf4c95d, 1);
     panel.setInteractive();
@@ -108,32 +115,26 @@ export class MetaProgressView {
     this.navHintText.setOrigin(1, 0);
     this.navHintText.setResolution(2);
 
-    const viewportBackground = scene.add.rectangle(
+    this.viewportBackground = scene.add.rectangle(
       MetaProgressView.viewportCenterX,
       MetaProgressView.viewportCenterY,
-      MetaProgressView.viewportWidth,
-      MetaProgressView.viewportHeight,
+      this.viewportWidth,
+      this.viewportHeight,
       0x0b1320,
       0.8,
     );
-    viewportBackground.setStrokeStyle(2, 0x2f3b54, 1);
+    this.viewportBackground.setStrokeStyle(2, 0x2f3b54, 1);
 
-    const viewportMask = scene.add.graphics();
-    viewportMask.fillStyle(0xffffff, 1);
-    viewportMask.fillRect(
-      MetaProgressView.viewportCenterX - MetaProgressView.viewportWidth / 2,
-      MetaProgressView.viewportCenterY - MetaProgressView.viewportHeight / 2,
-      MetaProgressView.viewportWidth,
-      MetaProgressView.viewportHeight,
-    );
-    viewportMask.setVisible(false);
+    this.viewportMask = scene.add.graphics();
+    this.viewportMask.setVisible(false);
+    this.refreshViewportMask();
 
     this.treeContainer = scene.add.container(MetaProgressView.viewportCenterX, MetaProgressView.viewportCenterY);
-    this.treeContainer.setMask(viewportMask.createGeometryMask());
+    this.treeContainer.setMask(this.viewportMask.createGeometryMask());
 
     this.graph = scene.add.graphics();
     this.treeContainer.add(this.graph);
-    this.container.add([blocker, panel, title, this.knowledgeText, this.navHintText, viewportBackground, this.treeContainer]);
+    this.container.add([this.blocker, panel, title, this.knowledgeText, this.navHintText, this.viewportBackground, this.treeContainer]);
 
     metaUpgradeSpecs.forEach((spec) => {
       const position = nodePositions[spec.id];
@@ -201,6 +202,28 @@ export class MetaProgressView {
       this.handleWheelZoom(pointer, dy);
     });
 
+    this.layout(1280, 720, 1);
+    this.applyTreeTransform();
+  }
+
+  layout(width: number, height: number, zoom: number): void {
+    const overlayScale = Math.min(1, width / 1100, height / 760);
+    this.containerScale = overlayScale / zoom;
+    this.screenScale = overlayScale;
+    this.screenCenterX = width / 2;
+    this.screenCenterY = height / 2;
+
+    this.viewportWidth = Math.min(960, Math.max(640, (width - 90) / overlayScale));
+    this.viewportHeight = Math.min(478, Math.max(260, (height - 240) / overlayScale));
+
+    this.container.setPosition((width / 2) / zoom, (height / 2) / zoom);
+    this.container.setScale(this.containerScale);
+    this.blocker.setSize(width / overlayScale, height / overlayScale);
+    this.viewportBackground.setSize(this.viewportWidth, this.viewportHeight);
+    this.continueButton.setY(this.viewportHeight / 2 + 64);
+    this.navHintText.setVisible(width >= 900);
+
+    this.refreshViewportMask();
     this.applyTreeTransform();
   }
 
@@ -296,8 +319,8 @@ export class MetaProgressView {
       return;
     }
 
-    this.panOffsetX = this.panStartOffsetX + (pointer.x - this.panStartX);
-    this.panOffsetY = this.panStartOffsetY + (pointer.y - this.panStartY);
+    this.panOffsetX = this.panStartOffsetX + (pointer.x - this.panStartX) / this.screenScale;
+    this.panOffsetY = this.panStartOffsetY + (pointer.y - this.panStartY) / this.screenScale;
     this.applyTreeTransform();
   }
 
@@ -349,10 +372,10 @@ export class MetaProgressView {
 
   private clampPan(x: number, y: number, zoom: number): { x: number; y: number } {
     const margin = 80;
-    const viewportLeft = MetaProgressView.viewportCenterX - MetaProgressView.viewportWidth / 2;
-    const viewportRight = MetaProgressView.viewportCenterX + MetaProgressView.viewportWidth / 2;
-    const viewportTop = MetaProgressView.viewportCenterY - MetaProgressView.viewportHeight / 2;
-    const viewportBottom = MetaProgressView.viewportCenterY + MetaProgressView.viewportHeight / 2;
+    const viewportLeft = MetaProgressView.viewportCenterX - this.viewportWidth / 2;
+    const viewportRight = MetaProgressView.viewportCenterX + this.viewportWidth / 2;
+    const viewportTop = MetaProgressView.viewportCenterY - this.viewportHeight / 2;
+    const viewportBottom = MetaProgressView.viewportCenterY + this.viewportHeight / 2;
 
     const minX = viewportRight - this.treeBounds.right * zoom - margin;
     const maxX = viewportLeft - this.treeBounds.left * zoom + margin;
@@ -436,18 +459,29 @@ export class MetaProgressView {
 
   private toLocalPoint(pointer: Phaser.Input.Pointer): { x: number; y: number } {
     return {
-      x: pointer.x - this.container.x,
-      y: pointer.y - this.container.y,
+      x: (pointer.x - this.screenCenterX) / this.screenScale,
+      y: (pointer.y - this.screenCenterY) / this.screenScale,
     };
   }
 
   private isPointerInsideViewport(pointer: Phaser.Input.Pointer): boolean {
     const local = this.toLocalPoint(pointer);
-    const left = MetaProgressView.viewportCenterX - MetaProgressView.viewportWidth / 2;
-    const right = MetaProgressView.viewportCenterX + MetaProgressView.viewportWidth / 2;
-    const top = MetaProgressView.viewportCenterY - MetaProgressView.viewportHeight / 2;
-    const bottom = MetaProgressView.viewportCenterY + MetaProgressView.viewportHeight / 2;
+    const left = MetaProgressView.viewportCenterX - this.viewportWidth / 2;
+    const right = MetaProgressView.viewportCenterX + this.viewportWidth / 2;
+    const top = MetaProgressView.viewportCenterY - this.viewportHeight / 2;
+    const bottom = MetaProgressView.viewportCenterY + this.viewportHeight / 2;
     return local.x >= left && local.x <= right && local.y >= top && local.y <= bottom;
+  }
+
+  private refreshViewportMask(): void {
+    this.viewportMask.clear();
+    this.viewportMask.fillStyle(0xffffff, 1);
+    this.viewportMask.fillRect(
+      MetaProgressView.viewportCenterX - this.viewportWidth / 2,
+      MetaProgressView.viewportCenterY - this.viewportHeight / 2,
+      this.viewportWidth,
+      this.viewportHeight,
+    );
   }
 
   private drawLinks(state: GameState): void {

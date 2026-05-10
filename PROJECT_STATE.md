@@ -60,9 +60,12 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 ## UI State
 
 - Main HUD is camera-fixed and minimal.
+- Narrow mobile layouts compress the HUD, keep action buttons touch-sized, and can stack lesson cards into a two-row layout.
 - Rocket rolls from hangar to pad, launches upward, and the camera follows.
+- The game viewport now resizes responsively and zooms around the active hangar/pad play area instead of assuming a desktop-only 1280x720 frame.
 - Launch summary and cards are camera-fixed overlays.
 - Meta upgrades are displayed as an authored compass graph: root centered, economy west, flight east, and review/knowledge south.
+- Meta review, launch summary, and menu overlays scale down to fit smaller screens.
 - Meta graph text renders at higher text resolution and opens at 1:1 zoom to avoid blurry scaled labels.
 - Dev stats toggle with `D`.
 - Global menu includes reset game.

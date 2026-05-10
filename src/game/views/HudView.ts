@@ -15,6 +15,8 @@ export class HudView {
   private menuButton: Phaser.GameObjects.Text;
   private launchRollTween?: Phaser.Tweens.Tween;
   private launchRollActive = false;
+  private compactStats = false;
+  private primaryButtonBaseScale = 1;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -52,11 +54,11 @@ export class HudView {
     this.primaryButton.setInteractive({ useHandCursor: true });
     this.primaryButton.on('pointerdown', config.onPrimary);
     this.primaryButton.on('pointerover', () => {
-      this.primaryButton.setScale(1.05);
+      this.primaryButton.setScale(this.primaryButtonBaseScale * 1.05);
       this.primaryButton.setStyle({ backgroundColor: '#ffd166' });
     });
     this.primaryButton.on('pointerout', () => {
-      this.primaryButton.setScale(1);
+      this.primaryButton.setScale(this.primaryButtonBaseScale);
       this.primaryButton.setStyle({ backgroundColor: '#f4c95d' });
     });
 
@@ -87,6 +89,31 @@ export class HudView {
     this.menuButton.setDepth(40);
     this.menuButton.setInteractive({ useHandCursor: true });
     this.menuButton.on('pointerdown', config.onMenu);
+
+    this.layout(1280, 720, 1);
+  }
+
+  layout(width: number, height: number, zoom: number): void {
+    const narrow = width < 1100;
+    const uiScale = Phaser.Math.Clamp((narrow ? 0.94 : 1) / zoom, 1, 2.4);
+
+    this.compactStats = width < 960;
+
+    this.moneyText.setPosition(24 / zoom, 20 / zoom);
+    this.moneyText.setScale(uiScale);
+
+    this.statsText.setPosition((width / 2) / zoom, (narrow ? 78 : 24) / zoom);
+    this.statsText.setScale((narrow ? 0.88 : 1) / zoom);
+
+    this.primaryButton.setPosition((width / 2) / zoom, (height - 54) / zoom);
+    this.primaryButtonBaseScale = uiScale;
+    this.primaryButton.setScale(this.primaryButtonBaseScale);
+
+    this.metaButton.setPosition((width - 126) / zoom, 20 / zoom);
+    this.metaButton.setScale((narrow ? 0.92 : 1) / zoom);
+
+    this.menuButton.setPosition((width - 24) / zoom, 20 / zoom);
+    this.menuButton.setScale((narrow ? 0.92 : 1) / zoom);
   }
 
   update(money: number, launchCost: number, bankrupt: boolean, locked: boolean, stats: RocketStats): void {
@@ -138,13 +165,17 @@ export class HudView {
 
   private renderStats(stats: RocketStats): void {
     this.statsText.setText(
-      `THR ${stats.thrust}  FUEL ${stats.fuel}  AERO ${stats.aerodynamics}  LIGHT ${stats.lightness}  GUIDE ${stats.guidance}  REL ${stats.reliability}`,
+      this.compactStats
+        ? `THR ${stats.thrust}  FUEL ${stats.fuel}  AERO ${stats.aerodynamics}\nLIGHT ${stats.lightness}  GUIDE ${stats.guidance}  REL ${stats.reliability}`
+        : `THR ${stats.thrust}  FUEL ${stats.fuel}  AERO ${stats.aerodynamics}  LIGHT ${stats.lightness}  GUIDE ${stats.guidance}  REL ${stats.reliability}`,
     );
   }
 
   private renderRolledStats(rolledStats: RolledRocketStats, reliability: number): void {
     this.statsText.setText(
-      `THR ${rolledStats.thrust}  FUEL ${rolledStats.fuel}  AERO ${rolledStats.aerodynamics}  LIGHT ${rolledStats.lightness}  GUIDE ${rolledStats.guidance}  REL ${reliability}`,
+      this.compactStats
+        ? `THR ${rolledStats.thrust}  FUEL ${rolledStats.fuel}  AERO ${rolledStats.aerodynamics}\nLIGHT ${rolledStats.lightness}  GUIDE ${rolledStats.guidance}  REL ${reliability}`
+        : `THR ${rolledStats.thrust}  FUEL ${rolledStats.fuel}  AERO ${rolledStats.aerodynamics}  LIGHT ${rolledStats.lightness}  GUIDE ${rolledStats.guidance}  REL ${reliability}`,
     );
   }
 }

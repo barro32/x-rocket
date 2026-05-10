@@ -34,6 +34,14 @@ export class LaunchSummaryView {
     });
 
     this.container.add([panel, title, altitude, detail]);
+
+    this.layout(1280, 720, 1);
+  }
+
+  layout(width: number, height: number, zoom: number): void {
+    const summaryScale = Math.min(1, width / 680, height / 260) / zoom;
+    this.container.setPosition((width / 2) / zoom, Math.min(190, height * 0.26) / zoom);
+    this.container.setScale(summaryScale * 0.92);
   }
 
   enter(): Promise<void> {
@@ -41,8 +49,8 @@ export class LaunchSummaryView {
       this.scene.tweens.add({
         targets: this.container,
         alpha: 1,
-        scale: 1,
-        y: 178,
+        scale: this.container.scaleX / 0.92,
+        y: this.container.y - (12 / this.scene.cameras.main.zoom),
         duration: 260,
         ease: 'Back.easeOut',
         onComplete: () => resolve(),

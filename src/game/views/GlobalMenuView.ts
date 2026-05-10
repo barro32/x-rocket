@@ -6,6 +6,7 @@ interface GlobalMenuViewConfig {
 
 export class GlobalMenuView {
   private readonly container: Phaser.GameObjects.Container;
+  private readonly blocker: Phaser.GameObjects.Rectangle;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -14,8 +15,8 @@ export class GlobalMenuView {
     this.container = scene.add.container(640, 360).setDepth(80).setVisible(false).setAlpha(0);
     this.container.setScrollFactor(0);
 
-    const blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.72);
-    blocker.setInteractive();
+    this.blocker = scene.add.rectangle(0, 0, 1280, 720, 0x050711, 0.72);
+    this.blocker.setInteractive();
 
     const panel = scene.add.rectangle(0, 0, 420, 260, 0x101828, 0.96);
     panel.setStrokeStyle(4, 0xf4c95d, 1);
@@ -49,7 +50,16 @@ export class GlobalMenuView {
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerdown', () => this.hide());
 
-    this.container.add([blocker, panel, title, resetButton, closeButton]);
+    this.container.add([this.blocker, panel, title, resetButton, closeButton]);
+
+    this.layout(1280, 720, 1);
+  }
+
+  layout(width: number, height: number, zoom: number): void {
+    const menuScale = Math.min(1, width / 540, height / 420) / zoom;
+    this.container.setPosition((width / 2) / zoom, (height / 2) / zoom);
+    this.container.setScale(menuScale);
+    this.blocker.setSize(width / (zoom * menuScale), height / (zoom * menuScale));
   }
 
   show(): void {
