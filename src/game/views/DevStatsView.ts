@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { fuelSustainFactor, launchVariance, orbitScoreThreshold, rocketScore, thrustLiftFactor } from '../../sim/rocketStats';
+import { simulateLaunchPhysics } from '../../sim/launchPhysics';
+import { orbitScoreThreshold, rocketScore } from '../../sim/rocketStats';
 import type { GameState } from '../../sim/types';
 
 export class DevStatsView {
@@ -33,8 +34,7 @@ export class DevStatsView {
 
     const stats = state.rocketStats;
     const score = rocketScore(stats);
-    const liftFactor = thrustLiftFactor(stats.thrust);
-    const sustainFactor = fuelSustainFactor(stats.fuel);
+    const physics = simulateLaunchPhysics(stats, stats.reliability / 99);
     this.text.setText(
       [
         'DEV ROCKET STATS',
@@ -44,11 +44,14 @@ export class DevStatsView {
         `lightness: ${fmt(stats.lightness)}`,
         `guidance: ${fmt(stats.guidance)}`,
         `reliability: ${fmt(stats.reliability)}`,
-        `variance: +/-${launchVariance(stats)}`,
         `score: ${fmt(score)}`,
-        `thrust lift: ${fmt(liftFactor)}`,
-        `fuel sustain: ${fmt(sustainFactor)}`,
-        `alt score: ${fmt(score * liftFactor * sustainFactor)}`,
+        `orbit progress: ${fmt(physics.orbitProgress * 100)}%`,
+        `burn: ${fmt(physics.burnTimeSeconds)}s`,
+        `angle: ${fmt(physics.launchAngleDegrees)}deg`,
+        `mass: ${fmt(physics.massKg)}kg`,
+        `accel: ${fmt(physics.thrustAccelerationMetersPerSecondSquared)}m/s2`,
+        `downrange: ${fmt(physics.downrangeMeters)}m`,
+        `impact: ${fmt(physics.impactVelocityMetersPerSecond)}m/s`,
         `orbit: ${orbitScoreThreshold}`,
       ].join('\n'),
     );

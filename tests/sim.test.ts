@@ -67,10 +67,10 @@ describe('rocket simulation', () => {
     })).toBe(15);
   });
 
-  it('does not roll zero launch stats upward or leave the pad', () => {
-    const next = simulateLaunch(createInitialState(1), new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0]));
+  it('uses exact zero launch stats and leaves the rocket on the pad', () => {
+    const next = simulateLaunch(createInitialState(1), new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99]));
 
-    expect(next.lastLaunch?.rolledStats).toEqual({
+    expect(next.lastLaunch?.launchStats).toEqual({
       thrust: 0,
       fuel: 0,
       aerodynamics: 0,
@@ -94,13 +94,13 @@ describe('rocket simulation', () => {
         reliability: 99,
       },
     };
-    const next = simulateLaunch(state, new FixedRng([0.99, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
+    const next = simulateLaunch(state, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99]));
 
-    expect(next.lastLaunch?.rolledStats.thrust).toBe(0);
+    expect(next.lastLaunch?.launchStats.thrust).toBe(0);
     expect(next.lastLaunch?.altitudeMeters).toBe(0);
   });
 
-  it('requires enough altitude score to reach orbit', () => {
+  it('requires enough physical vertical acceleration to reach orbit', () => {
     const state = {
       ...createInitialState(1),
       money: 1_000,
@@ -115,8 +115,69 @@ describe('rocket simulation', () => {
     };
     const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
 
-    expect(next.lastLaunch?.score).toBeGreaterThan(orbitScoreThreshold);
+    expect(next.lastLaunch?.score).toBeLessThan(orbitScoreThreshold);
     expect(next.lastLaunch?.outcome).toBe('failed');
+  });
+
+  it('derives launch angle from guidance', () => {
+    const guidedState = {
+      ...createInitialState(1),
+      money: 1_000,
+      rocketStats: {
+        thrust: 92,
+        fuel: 50,
+        aerodynamics: 50,
+        lightness: 50,
+        guidance: 99,
+        reliability: 99,
+      },
+    };
+    const angledState = {
+      ...guidedState,
+      rocketStats: {
+        ...guidedState.rocketStats,
+        guidance: 0,
+      },
+    };
+    const guidedLaunch = simulateLaunch(guidedState, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99]));
+    const angledLaunch = simulateLaunch(angledState, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99]));
+
+    expect(guidedLaunch.lastLaunch?.physics.launchAngleDegrees).toBe(0);
+    expect(angledLaunch.lastLaunch?.physics.launchAngleDegrees).toBeGreaterThan(30);
+    expect(guidedLaunch.lastLaunch?.altitudeMeters).toBeGreaterThan(angledLaunch.lastLaunch?.altitudeMeters ?? 0);
+    expect(angledLaunch.lastLaunch?.physics.downrangeMeters).toBeGreaterThan(guidedLaunch.lastLaunch?.physics.downrangeMeters ?? 0);
+  });
+
+  it('uses thrust as acceleration and fuel as burn time', () => {
+    const cleanFlightRng = [0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99];
+    const highThrustState = {
+      ...createInitialState(1),
+      money: 1_000,
+      rocketStats: {
+        thrust: 92,
+        fuel: 2,
+        aerodynamics: 2,
+        lightness: 2,
+        guidance: 2,
+        reliability: 99,
+      },
+    };
+    const highFuelState = {
+      ...highThrustState,
+      rocketStats: {
+        thrust: 2,
+        fuel: 92,
+        aerodynamics: 2,
+        lightness: 2,
+        guidance: 2,
+        reliability: 99,
+      },
+    };
+    const highThrust = simulateLaunch(highThrustState, new FixedRng(cleanFlightRng));
+    const highFuel = simulateLaunch(highFuelState, new FixedRng(cleanFlightRng));
+
+    expect(highThrust.lastLaunch?.physics.thrustAccelerationMetersPerSecondSquared).toBeGreaterThan(highFuel.lastLaunch?.physics.thrustAccelerationMetersPerSecondSquared ?? 0);
+    expect(highThrust.lastLaunch?.physics.burnTimeSeconds).toBeLessThan(highFuel.lastLaunch?.physics.burnTimeSeconds ?? 0);
   });
 
   it('uses fuel to sustain altitude after thrust gets the rocket moving', () => {
@@ -148,7 +209,7 @@ describe('rocket simulation', () => {
     expect(fueledLaunch.lastLaunch?.altitudeMeters).toBeGreaterThan(dryLaunch.lastLaunch?.altitudeMeters ?? 0);
   });
 
-  it('allows nonzero launch stats to overperform without letting zero stats do so', () => {
+  it('uses exact launch stats without random overperformance', () => {
     const state = {
       ...createInitialState(1),
       money: 1_000,
@@ -163,9 +224,14 @@ describe('rocket simulation', () => {
     };
     const next = simulateLaunch(state, new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99]));
 
-    expect(next.lastLaunch?.rolledStats.thrust).toBeGreaterThan(state.rocketStats.thrust);
-    expect(next.lastLaunch?.rolledStats.fuel).toBeGreaterThan(state.rocketStats.fuel);
-    expect(next.lastLaunch?.score).toBeGreaterThan(rocketScore(state.rocketStats));
+    expect(next.lastLaunch?.launchStats).toEqual({
+      thrust: state.rocketStats.thrust,
+      fuel: state.rocketStats.fuel,
+      aerodynamics: state.rocketStats.aerodynamics,
+      lightness: state.rocketStats.lightness,
+      guidance: state.rocketStats.guidance,
+    });
+    expect(next.lastLaunch?.score).toBe(rocketScore(state.rocketStats));
   });
 
   it('caps perfect max-stat launch altitude at 500 kilometers', () => {
@@ -183,7 +249,7 @@ describe('rocket simulation', () => {
     };
     const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
 
-    expect(next.lastLaunch?.rolledStats).toEqual({
+    expect(next.lastLaunch?.launchStats).toEqual({
       thrust: 99,
       fuel: 99,
       aerodynamics: 99,
@@ -445,7 +511,7 @@ describe('rocket simulation', () => {
     expect(claimedAgain.knowledge).toBe(0);
   });
 
-  it('reliability tightens the launch variance band', () => {
+  it('reliability lessons still improve the reliability stat', () => {
     const base = createInitialState(1);
     const reinforced = chooseLesson({ ...base, pendingLessonChoices: ['reinforceFrame'] }, 'reinforceFrame');
 
@@ -520,7 +586,7 @@ describe('rocket simulation', () => {
       missionControl: 1,
       advancedAerodynamics: 1,
     });
-    const next = simulateLaunch(state, new FixedRng([0.5, 0.99, 0.99, 0, 0.99, 0.99, 0]));
+    const next = simulateLaunch(state, new FixedRng([0.99, 0.99, 0, 0.99, 0.99, 0]));
 
     expect(next.lastLaunch?.failedStat).toBe('aerodynamics');
     expect(next.pendingLessonChoices).toContain('fairNoseCone');

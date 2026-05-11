@@ -81,7 +81,7 @@ export class GameScene extends Phaser.Scene {
     this.busy = true;
     this.renderState();
     const launchStats = this.effectiveRocketStats();
-    this.ui.beginLaunchRoll(launchStats.reliability);
+    this.ui.beginLaunchStats(launchStats.reliability);
 
     await this.rocket.rolloutToPad();
 
@@ -108,18 +108,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     const launchProfile = {
-      ...result.rolledStats,
+      ...result.launchStats,
       reliability: launchStats.reliability / 99,
       outcome: result.outcome,
-      failedStat: result.failedStat,
+      physics: result.physics,
     };
-    const launchRollDuration = this.rocket.ignitionDuration(launchProfile) + this.rocket.flightDuration(result.altitudeMeters, launchProfile);
+    const launchStatsDuration = this.rocket.ignitionDuration(launchProfile) + this.rocket.flightDuration(result.altitudeMeters, launchProfile);
 
-    this.ui.animateLaunchRoll(result.rolledStats, launchStats.reliability, launchRollDuration);
+    this.ui.animateLaunchStats(result.launchStats, launchStats.reliability, launchStatsDuration);
 
     this.effects.ignition(this.world.launchPad.x, this.world.launchPad.y, {
-      thrust: result.rolledStats.thrust,
-      fuel: result.rolledStats.fuel,
+      thrust: result.launchStats.thrust,
+      fuel: result.launchStats.fuel,
     });
     await this.rocket.ignite(launchProfile);
 
@@ -141,7 +141,7 @@ export class GameScene extends Phaser.Scene {
       this.nextLaunchPrep = undefined;
     });
 
-    this.ui.endLaunchRoll(this.effectiveRocketStats());
+    this.ui.endLaunchStats(this.effectiveRocketStats());
     this.persistAndRender();
     await wait(this, 360);
     if (this.state.pendingLessonChoices.length > 0) {

@@ -13,7 +13,7 @@ const baseRocketStats: RocketStats = {
   reliability: 0,
 };
 
-export const orbitScoreThreshold = 132;
+export const orbitScoreThreshold = 495;
 
 export function createBaseRocketStats(metaUpgrades?: Record<MetaUpgradeId, number>): RocketStats {
   const stats = cloneRocketStats(baseRocketStats);
@@ -38,30 +38,6 @@ export function improveRocketStat(stats: RocketStats, statId: RocketStatId, amou
 
 export function rocketScore(stats: Pick<RocketStats, 'thrust' | 'fuel' | 'aerodynamics' | 'lightness' | 'guidance'>): number {
   return stats.thrust + stats.fuel + stats.aerodynamics + stats.lightness + stats.guidance;
-}
-
-export function thrustLiftFactor(thrust: number): number {
-  if (thrust <= 0) {
-    return 0;
-  }
-
-  return Math.pow(Math.min(1, Math.max(0, thrust / 99)), 0.72);
-}
-
-export function fuelSustainFactor(fuel: number): number {
-  return 0.12 + 0.88 * Math.pow(Math.min(1, Math.max(0, fuel / 99)), 0.68);
-}
-
-export const perfectRocketScore = rocketScore({
-  thrust: 99,
-  fuel: 99,
-  aerodynamics: 99,
-  lightness: 99,
-  guidance: 99,
-});
-
-export function launchVariance(stats: RocketStats): number {
-  return Math.max(5, 18 - Math.floor(stats.reliability / 8));
 }
 
 export function statLabel(statId: RocketStatId): string {

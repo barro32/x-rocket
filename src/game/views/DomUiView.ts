@@ -1,5 +1,5 @@
 import './DomUiView.css';
-import type { LaunchResult, LessonSpec, RocketStats, RolledRocketStats } from '../../sim/types';
+import type { LaunchResult, LaunchRocketStats, LessonSpec, RocketStats } from '../../sim/types';
 
 interface DomUiViewConfig {
   onPrimary: () => void;
@@ -39,8 +39,8 @@ export class DomUiView {
   private readonly resetButton: HTMLButtonElement;
   private readonly closeMenuButton: HTMLButtonElement;
 
-  private launchRollFrame?: number;
-  private launchRollActive = false;
+  private launchStatsFrame?: number;
+  private launchStatsActive = false;
   private currentStats?: RocketStats;
 
   constructor(config: DomUiViewConfig) {
@@ -95,7 +95,7 @@ export class DomUiView {
   update(state: UiState): void {
     this.currentStats = state.stats;
     this.moneyText.textContent = `$${state.money}`;
-    if (!this.launchRollActive) {
+    if (!this.launchStatsActive) {
       this.renderStats(state.stats);
     }
     this.primaryButton.textContent = state.bankrupt ? 'Bankruptcy Review' : `Launch $${state.launchCost}`;
@@ -103,21 +103,21 @@ export class DomUiView {
     this.metaButton.disabled = state.locked;
   }
 
-  beginLaunchRoll(reliability: number): void {
-    this.stopLaunchRoll();
-    this.launchRollActive = true;
-    this.renderRolledStats({ thrust: 0, fuel: 0, aerodynamics: 0, lightness: 0, guidance: 0 }, reliability);
+  beginLaunchStats(reliability: number): void {
+    this.stopLaunchStatsAnimation();
+    this.launchStatsActive = true;
+    this.renderLaunchStats({ thrust: 0, fuel: 0, aerodynamics: 0, lightness: 0, guidance: 0 }, reliability);
   }
 
-  animateLaunchRoll(target: RolledRocketStats, reliability: number, duration: number): void {
-    this.stopLaunchRoll();
-    this.launchRollActive = true;
+  animateLaunchStats(target: LaunchRocketStats, reliability: number, duration: number): void {
+    this.stopLaunchStatsAnimation();
+    this.launchStatsActive = true;
     const startedAt = performance.now();
 
     const tick = (now: number): void => {
       const progress = Math.min(1, (now - startedAt) / Math.max(1, duration));
       const eased = 1 - Math.pow(1 - progress, 2);
-      this.renderRolledStats({
+      this.renderLaunchStats({
         thrust: Math.floor(target.thrust * eased),
         fuel: Math.floor(target.fuel * eased),
         aerodynamics: Math.floor(target.aerodynamics * eased),
@@ -126,19 +126,19 @@ export class DomUiView {
       }, reliability);
 
       if (progress < 1) {
-        this.launchRollFrame = requestAnimationFrame(tick);
+        this.launchStatsFrame = requestAnimationFrame(tick);
       } else {
-        this.renderRolledStats(target, reliability);
-        this.launchRollFrame = undefined;
+        this.renderLaunchStats(target, reliability);
+        this.launchStatsFrame = undefined;
       }
     };
 
-    this.launchRollFrame = requestAnimationFrame(tick);
+    this.launchStatsFrame = requestAnimationFrame(tick);
   }
 
-  endLaunchRoll(stats: RocketStats): void {
-    this.stopLaunchRoll();
-    this.launchRollActive = false;
+  endLaunchStats(stats: RocketStats): void {
+    this.stopLaunchStatsAnimation();
+    this.launchStatsActive = false;
     this.renderStats(stats);
   }
 
@@ -230,14 +230,14 @@ export class DomUiView {
     this.statsText.textContent = `THR ${stats.thrust}  FUEL ${stats.fuel}  AERO ${stats.aerodynamics}  LIGHT ${stats.lightness}  GUIDE ${stats.guidance}  REL ${stats.reliability}`;
   }
 
-  private renderRolledStats(rolledStats: RolledRocketStats, reliability: number): void {
-    this.statsText.textContent = `THR ${rolledStats.thrust}  FUEL ${rolledStats.fuel}  AERO ${rolledStats.aerodynamics}  LIGHT ${rolledStats.lightness}  GUIDE ${rolledStats.guidance}  REL ${reliability}`;
+  private renderLaunchStats(launchStats: LaunchRocketStats, reliability: number): void {
+    this.statsText.textContent = `THR ${launchStats.thrust}  FUEL ${launchStats.fuel}  AERO ${launchStats.aerodynamics}  LIGHT ${launchStats.lightness}  GUIDE ${launchStats.guidance}  REL ${reliability}`;
   }
 
-  private stopLaunchRoll(): void {
-    if (this.launchRollFrame) {
-      cancelAnimationFrame(this.launchRollFrame);
-      this.launchRollFrame = undefined;
+  private stopLaunchStatsAnimation(): void {
+    if (this.launchStatsFrame) {
+      cancelAnimationFrame(this.launchStatsFrame);
+      this.launchStatsFrame = undefined;
     }
   }
 

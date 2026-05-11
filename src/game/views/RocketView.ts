@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { LaunchOutcome, RocketStatId } from '../../sim/types';
+import type { LaunchOutcome, LaunchPhysics, LaunchTrajectoryPoint } from '../../sim/types';
 
 interface LaunchVisualProfile {
   thrust: number;
@@ -9,24 +9,15 @@ interface LaunchVisualProfile {
   guidance: number;
   reliability: number;
   outcome?: LaunchOutcome;
-  failedStat?: RocketStatId;
+  physics?: LaunchPhysics;
 }
 
 const ROCKET_ORIGIN_Y = 0.66;
-const MAX_NORMAL_TILT = 16;
-
-interface FlightCurve {
-  burnEnd: number;
-  acceleration: number;
-  gravity: number;
-  finalHeight: number;
-}
 
 export class RocketView {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly outerFlame: Phaser.GameObjects.Triangle;
   private readonly innerFlame: Phaser.GameObjects.Triangle;
-  private burnTween?: Phaser.Tweens.Tween;
   private readyAtPad = false;
 
   constructor(
@@ -153,8 +144,8 @@ export class RocketView {
   }
 
   async flyTo(altitudeMeters: number, profile: LaunchVisualProfile): Promise<Phaser.Math.Vector2> {
-    const visualRise = altitudeToPixels(altitudeMeters);
-    if (visualRise <= 0) {
+    const trajectory = profile.physics?.trajectory ?? [];
+    if (!profile.physics || trajectory.length < 2 || altitudeMeters <= 0) {
       this.stopBurn();
       this.sprite.setAngle(0);
       this.setRocketBasePosition(this.launchPad.x, this.launchPad.y);
@@ -162,41 +153,17 @@ export class RocketView {
       return new Phaser.Math.Vector2(this.sprite.x, this.sprite.y);
     }
 
-    const targetY = this.launchPad.y - visualRise;
-    const thrust = statRatio(profile.thrust);
-    const fuel = statRatio(profile.fuel);
-    const aerodynamics = statRatio(profile.aerodynamics);
-    const lightness = statRatio(profile.lightness);
-    const guidance = statRatio(profile.guidance);
-    const stability = guidance * 0.52 + aerodynamics * 0.28 + profile.reliability * 0.2;
-    const horizontalBias = profile.guidance >= profile.aerodynamics ? 1 : -1;
-    const driftMagnitude = (1 - guidance) * 95 + (1 - aerodynamics) * 58 + lightness * 34 + (1 - profile.reliability) * 42;
-    const driftX = horizontalBias * driftMagnitude;
-    const wobble = (1 - stability) * 28;
-    const buffeting = (1 - aerodynamics) * 22 + (1 - profile.reliability) * 14;
-    const flightCurve = createFlightCurve(thrust, fuel);
+    const physics = profile.physics;
     const duration = this.flightDuration(altitudeMeters, profile);
 
     this.startBurn(profile, false);
 
     await tweenProgress(this.scene, duration, (progress) => {
-      const eased = ascentProgress(progress, flightCurve);
-      const launchWeight = Phaser.Math.Clamp(eased / 0.18, 0, 1);
-      const aeroFlutter = Math.sin(progress * Math.PI * (7 + (1 - aerodynamics) * 8)) * buffeting * Math.sin(progress * Math.PI);
-      const guidanceWander = Math.sin(progress * Math.PI * 2.3) * wobble * (1 - eased * 0.48);
-      const failurePull = failureDrift(profile.failedStat, progress);
-      const driftWave = guidanceWander + aeroFlutter + failurePull;
-      const baseX = this.launchPad.x + driftX * eased + driftWave * launchWeight;
-      const baseY = Phaser.Math.Linear(this.launchPad.y, targetY, eased);
-      const normalTilt = Phaser.Math.Clamp(driftX * 0.018 * eased + driftWave * 0.16 * launchWeight, -MAX_NORMAL_TILT, MAX_NORMAL_TILT);
-      const failedTilt = failureAngle(profile.failedStat, progress);
-
-      this.sprite.setAngle(Phaser.Math.Clamp(normalTilt + failedTilt, -34, 34));
-      this.setRocketBasePosition(
-        baseX,
-        baseY,
-      );
-      this.updateFlightFlame(profile, progress, flightCurve.burnEnd);
+      const elapsedSeconds = progress * physics.totalTimeSeconds;
+      const sample = sampleTrajectory(trajectory, elapsedSeconds);
+      this.sprite.setAngle(Phaser.Math.Clamp(sample.angleDegrees, -160, 160));
+      this.setRocketBasePosition(this.launchPad.x + horizontalMetersToPixels(sample.xMeters), this.launchPad.y - altitudeToPixels(sample.yMeters));
+      this.updateFlightFlame(profile, elapsedSeconds, physics.burnTimeSeconds);
       this.syncFlamePosition();
     });
 
@@ -211,16 +178,9 @@ export class RocketView {
   }
 
   flightDuration(altitudeMeters: number, profile: LaunchVisualProfile): number {
+    const totalSeconds = profile.physics?.totalTimeSeconds ?? 1;
     const visualRise = altitudeToPixels(altitudeMeters);
-    const thrust = statRatio(profile.thrust);
-    const fuel = statRatio(profile.fuel);
-    const aerodynamics = statRatio(profile.aerodynamics);
-    const lightness = statRatio(profile.lightness);
-    return Phaser.Math.Clamp(
-      980 + visualRise * (2.55 - thrust * 0.78 - lightness * 0.24 - aerodynamics * 0.18) + fuel * 340,
-      1150,
-      4600,
-    );
+    return Phaser.Math.Clamp(900 + Math.log10(totalSeconds + 1) * 1250 + visualRise * 0.36, 1000, profile.outcome === 'orbit' ? 5200 : 7200);
   }
 
   explode(): Phaser.Math.Vector2 {
@@ -256,48 +216,37 @@ export class RocketView {
     this.outerFlame.setScale(thrustScale, fuelScale * (ignitionPhase ? 0.9 : 1.15));
     this.innerFlame.setScale(thrustScale * 0.68, fuelScale * (ignitionPhase ? 0.72 : 0.92));
     this.syncFlamePosition();
-    this.burnTween = this.scene.tweens.add({
-      targets: [this.outerFlame, this.innerFlame],
-      scaleY: `*=${ignitionPhase ? 1.08 : 1.16}`,
-      yoyo: true,
-      repeat: -1,
-      duration: Phaser.Math.Clamp(70 + (99 - profile.fuel) * 2.3, 80, 260),
-      onUpdate: () => this.syncFlamePosition(),
-    });
   }
 
-  private updateFlightFlame(profile: LaunchVisualProfile, progress: number, poweredEnd: number): void {
+  private updateFlightFlame(profile: LaunchVisualProfile, elapsedSeconds: number, burnSeconds: number): void {
     if (!this.outerFlame.visible || !this.innerFlame.visible) {
       return;
     }
 
-    if (progress > poweredEnd) {
-      const fade = Phaser.Math.Clamp(1 - (progress - poweredEnd) / 0.12, 0, 1);
+    if (elapsedSeconds > burnSeconds) {
+      const fade = Phaser.Math.Clamp(1 - (elapsedSeconds - burnSeconds) / 0.18, 0, 1);
+      const thrust = statRatio(profile.thrust);
+      const fuel = statRatio(profile.fuel);
+      const fuelStretch = Phaser.Math.Clamp(0.7 + fuel * 0.72, 0.52, 1.42);
       this.outerFlame.setAlpha(0.72 * fade);
       this.innerFlame.setAlpha(0.88 * fade);
-      this.outerFlame.setScale(this.outerFlame.scaleX, Math.max(0.12, this.outerFlame.scaleY * (0.94 + fade * 0.04)));
-      this.innerFlame.setScale(this.innerFlame.scaleX, Math.max(0.1, this.innerFlame.scaleY * (0.94 + fade * 0.04)));
+      this.outerFlame.setScale(0.72 + thrust * 1.35, Math.max(0.12, fuelStretch * fade));
+      this.innerFlame.setScale(0.48 + thrust * 0.88, Math.max(0.1, fuelStretch * fade * 0.7));
       return;
     }
 
     const thrust = statRatio(profile.thrust);
     const fuel = statRatio(profile.fuel);
-    const reliability = profile.reliability;
-    const lowFuelSputter = Math.max(0, 0.2 - fuel) * 1.8;
-    const sputter = 0.68 + fuel * 0.12 + reliability * 0.2 + Math.sin(progress * Math.PI * (12 + fuel * 18)) * (0.06 + (1 - reliability) * 0.18 + lowFuelSputter);
-    const throttle = Phaser.Math.Clamp(0.72 + thrust * 0.55, 0.6, 1.35) * Phaser.Math.Clamp(sputter, 0.35, 1.15);
-    const fuelStretch = Phaser.Math.Clamp(0.75 + fuel * 0.7, 0.55, 1.45);
+    const throttle = Phaser.Math.Clamp(0.78 + thrust * 0.48, 0.6, 1.28);
+    const fuelStretch = Phaser.Math.Clamp(0.7 + fuel * 0.72, 0.52, 1.42);
 
-    this.outerFlame.setAlpha(Phaser.Math.Clamp(0.58 + throttle * 0.26, 0.35, 0.95));
-    this.innerFlame.setAlpha(Phaser.Math.Clamp(0.72 + reliability * 0.24, 0.5, 0.98));
+    this.outerFlame.setAlpha(Phaser.Math.Clamp(0.62 + thrust * 0.28, 0.38, 0.94));
+    this.innerFlame.setAlpha(0.9);
     this.outerFlame.setScale(0.72 + thrust * 1.35, fuelStretch * throttle);
-    this.innerFlame.setScale(0.48 + thrust * 0.88, fuelStretch * throttle * 0.72);
+    this.innerFlame.setScale(0.48 + thrust * 0.88, fuelStretch * throttle * 0.7);
   }
 
   private stopBurn(fadeDuration = 0): void {
-    this.burnTween?.stop();
-    this.burnTween = undefined;
-
     if (!this.outerFlame.visible && !this.innerFlame.visible) {
       return;
     }
@@ -359,56 +308,44 @@ function statRatio(value: number): number {
   return Phaser.Math.Clamp(value / 99, 0, 1);
 }
 
-function ascentProgress(progress: number, poweredEnd: number, thrust: number): number {
-  if (progress <= poweredEnd) {
-    const poweredProgress = progress / poweredEnd;
-    return 0.66 * Math.pow(poweredProgress, Phaser.Math.Linear(2.45, 1.42, thrust));
+function horizontalMetersToPixels(meters: number): number {
+  const sign = Math.sign(meters);
+  const absMeters = Math.abs(meters);
+  if (absMeters <= 100) {
+    return meters * 0.35;
   }
 
-  const coastProgress = (progress - poweredEnd) / Math.max(0.01, 1 - poweredEnd);
-  return 0.66 + 0.34 * Phaser.Math.Easing.Quadratic.Out(coastProgress);
+  return sign * (35 + Math.log10(absMeters / 100 + 1) * 260);
 }
 
-function failureDrift(statId: RocketStatId | undefined, progress: number): number {
-  if (!statId) {
-    return 0;
+function sampleTrajectory(trajectory: LaunchTrajectoryPoint[], elapsedSeconds: number): LaunchTrajectoryPoint {
+  const first = trajectory[0];
+  const last = trajectory[trajectory.length - 1];
+  if (elapsedSeconds <= first.timeSeconds) {
+    return first;
+  }
+  if (elapsedSeconds >= last.timeSeconds) {
+    return last;
   }
 
-  const failureRamp = Phaser.Math.Easing.Cubic.In(Phaser.Math.Clamp(progress, 0, 1));
-  switch (statId) {
-    case 'guidance':
-      return Math.sin(progress * Math.PI * 5.5) * 90 * failureRamp;
-    case 'aerodynamics':
-      return Math.sin(progress * Math.PI * 12) * 42 * Math.sin(progress * Math.PI);
-    case 'lightness':
-      return Math.sin(progress * Math.PI * 8) * 28 * failureRamp;
-    case 'fuel':
-      return Math.sin(progress * Math.PI * 3) * 18 * failureRamp;
-    case 'thrust':
-    case 'reliability':
-      return Math.sin(progress * Math.PI * 18) * 14 * (1 - progress);
-  }
+  const nextIndex = trajectory.findIndex((point) => point.timeSeconds >= elapsedSeconds);
+  const next = trajectory[Math.max(1, nextIndex)];
+  const previous = trajectory[nextIndex - 1];
+  const segmentProgress = (elapsedSeconds - previous.timeSeconds) / Math.max(0.001, next.timeSeconds - previous.timeSeconds);
+
+  return {
+    timeSeconds: elapsedSeconds,
+    xMeters: Phaser.Math.Linear(previous.xMeters, next.xMeters, segmentProgress),
+    yMeters: Phaser.Math.Linear(previous.yMeters, next.yMeters, segmentProgress),
+    velocityX: Phaser.Math.Linear(previous.velocityX, next.velocityX, segmentProgress),
+    velocityY: Phaser.Math.Linear(previous.velocityY, next.velocityY, segmentProgress),
+    angleDegrees: normalizeDegrees(previous.angleDegrees + normalizeDegrees(next.angleDegrees - previous.angleDegrees) * segmentProgress),
+    powered: previous.powered || next.powered,
+  };
 }
 
-function failureAngle(statId: RocketStatId | undefined, progress: number): number {
-  if (!statId) {
-    return 0;
-  }
-
-  const ramp = Phaser.Math.Easing.Cubic.In(Phaser.Math.Clamp(progress, 0, 1));
-  switch (statId) {
-    case 'guidance':
-      return 30 * ramp;
-    case 'aerodynamics':
-      return Math.sin(progress * Math.PI * 10) * 22 * Math.sin(progress * Math.PI);
-    case 'lightness':
-      return -20 * ramp;
-    case 'fuel':
-      return 8 * ramp;
-    case 'thrust':
-    case 'reliability':
-      return Math.sin(progress * Math.PI * 20) * 7 * (1 - progress);
-  }
+function normalizeDegrees(value: number): number {
+  return ((value + 180) % 360 + 360) % 360 - 180;
 }
 
 function tween(scene: Phaser.Scene, config: Phaser.Types.Tweens.TweenBuilderConfig): Promise<void> {

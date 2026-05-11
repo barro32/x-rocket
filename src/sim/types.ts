@@ -59,10 +59,35 @@ export interface LaunchResult {
   moneyDelta: number;
   reliability: number;
   score: number;
-  rolledStats: RolledRocketStats;
+  physics: LaunchPhysics;
+  launchStats: LaunchRocketStats;
   failurePhase?: FailurePhase;
   failedStat?: RocketStatId;
   message: string;
+}
+
+export interface LaunchPhysics {
+  orbitProgress: number;
+  maxAltitudeMeters: number;
+  downrangeMeters: number;
+  burnTimeSeconds: number;
+  totalTimeSeconds: number;
+  launchAngleDegrees: number;
+  massKg: number;
+  thrustAccelerationMetersPerSecondSquared: number;
+  peakVelocityMetersPerSecond: number;
+  impactVelocityMetersPerSecond: number;
+  trajectory: LaunchTrajectoryPoint[];
+}
+
+export interface LaunchTrajectoryPoint {
+  timeSeconds: number;
+  xMeters: number;
+  yMeters: number;
+  velocityX: number;
+  velocityY: number;
+  angleDegrees: number;
+  powered: boolean;
 }
 
 export interface RocketStats {
@@ -74,7 +99,7 @@ export interface RocketStats {
   reliability: number;
 }
 
-export type RolledRocketStats = Pick<RocketStats, 'thrust' | 'fuel' | 'aerodynamics' | 'lightness' | 'guidance'>;
+export type LaunchRocketStats = Pick<RocketStats, 'thrust' | 'fuel' | 'aerodynamics' | 'lightness' | 'guidance'>;
 
 export interface GameState {
   version: 2;
