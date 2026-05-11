@@ -2,17 +2,17 @@
   position: absolute;
   top: 5.1rem;
   right: clamp(0.75rem, 2vw, 1.5rem);
-  z-index: 18;
+  z-index: var(--z-dev-panel);
   display: grid;
   gap: 0.7rem;
   width: min(23rem, calc(100vw - 1.5rem));
   padding: 0.8rem;
-  border: 1px solid rgba(142, 246, 197, 0.28);
-  border-radius: 0.5rem;
-  background: rgba(5, 7, 17, 0.86);
-  box-shadow: 0 0.8rem 1.8rem rgba(5, 7, 17, 0.34);
-  color: #f6e7c7;
-  font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  border: 1px solid rgba(var(--rgb-mint), 0.28);
+  border-radius: var(--radius-md);
+  background: rgba(var(--rgb-shadow), 0.86);
+  box-shadow: 0 0.8rem 1.8rem rgba(var(--rgb-shadow), 0.34);
+  color: var(--color-cream);
+  font-family: var(--font-mono-ui);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-0.35rem);
@@ -40,7 +40,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  color: #8ef6c5;
+  color: var(--color-mint);
   font-size: 0.82rem;
   font-weight: 900;
 }
@@ -48,16 +48,16 @@
 .dev-launch-panel__toggle input {
   width: 1rem;
   height: 1rem;
-  accent-color: #8ef6c5;
+  accent-color: var(--color-mint);
 }
 
 .dev-launch-panel__reset {
   min-height: 1.9rem;
   padding: 0.35rem 0.55rem;
   border: 0;
-  border-radius: 0.35rem;
-  background: #f6e7c7;
-  color: #101828;
+  border-radius: var(--radius-xs);
+  background: var(--color-cream);
+  color: var(--color-ink);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 900;
@@ -79,18 +79,18 @@
 }
 
 .dev-launch-panel__label {
-  color: #d8e2dc;
+  color: var(--color-body-copy);
 }
 
 .dev-launch-panel__value {
-  color: #ffd166;
+  color: var(--color-gold-bright);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 .dev-launch-panel__slider {
   width: 100%;
-  accent-color: #ff6b35;
+  accent-color: var(--color-orange);
 }
 
 @media (max-width: 780px), (max-height: 560px) {

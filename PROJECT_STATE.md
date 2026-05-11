@@ -66,7 +66,7 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 ## UI State
 
 - Main HUD is now a DOM overlay above Phaser, with responsive layout for narrow and short windows.
-- DOM overlay styles are split by owner: global base styles live in `src/styles/base.css`, while `DomUiView`, `DomMetaProgressView`, and `DevLaunchPanelView` import their own adjacent CSS files.
+- DOM overlay styles are split by owner: global base styles and design tokens live in `src/styles/base.css`, while `DomUiView`, `DomMetaProgressView`, and `DevLaunchPanelView` import their own adjacent CSS files. Shared tokens now cover palette, UI states, graph colors, lesson card accents/art backgrounds, radii, shadows, fonts, and layer order.
 - Rocket rolls from hangar to pad, launches upward, and the camera follows. Launch animation now uses rolled stats for clearer physical presentation: thrust affects acceleration/flame size, fuel affects burn duration/cutoff, aerodynamics/guidance/reliability affect wobble and drift, and failed systems add phase-specific instability. Takeoff now has a slower ignition/ascent ramp, body-centered shake, and flame alignment that follows rocket tilt.
 - Launch summary and lesson cards are DOM overlays with CSS-driven responsive grid/stack behavior. Phaser still handles world, rocket, camera, and effects.
 - Lesson cards show exact current effect values from active meta upgrades instead of vague scaling labels.

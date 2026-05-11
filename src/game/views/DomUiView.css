@@ -1,10 +1,10 @@
 .game-ui {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: var(--z-hud);
   pointer-events: none;
-  color: #f6e7c7;
-  font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  color: var(--color-cream);
+  font-family: var(--font-mono-ui);
 }
 
 .hud {
@@ -23,16 +23,16 @@
 .hud__primary,
 .hud__icon-button {
   border: 0;
-  box-shadow: 0 0.45rem 1.2rem rgba(5, 7, 17, 0.28);
+  box-shadow: var(--shadow-control);
   line-height: 1;
 }
 
 .hud__money,
 .hud__stats {
   align-self: start;
-  background: rgba(11, 16, 36, 0.78);
-  border: 1px solid rgba(246, 231, 199, 0.18);
-  border-radius: 0.45rem;
+  background: var(--color-panel-soft);
+  border: 1px solid rgba(var(--rgb-cream), 0.18);
+  border-radius: var(--radius-sm);
 }
 
 .hud__money {
@@ -40,7 +40,7 @@
   padding: 0.65rem 0.85rem;
   font-size: clamp(1.25rem, 3.3vw, 1.8rem);
   font-weight: 800;
-  color: #f6e7c7;
+  color: var(--color-cream);
 }
 
 .hud__stats {
@@ -49,7 +49,7 @@
   max-width: min(52rem, 100%);
   padding: 0.55rem 0.75rem;
   overflow: hidden;
-  color: #8ef6c5;
+  color: var(--color-mint);
   font-size: clamp(0.72rem, 1.5vw, 0.95rem);
   line-height: 1.25;
   text-align: center;
@@ -72,9 +72,9 @@
   min-width: min(24rem, calc(100vw - 2rem));
   min-height: 3.25rem;
   padding: 0.8rem 1.45rem;
-  border-radius: 0.5rem;
-  background: #f4c95d;
-  color: #101828;
+  border-radius: var(--radius-md);
+  background: var(--color-gold);
+  color: var(--color-ink);
   cursor: pointer;
   font-size: clamp(1rem, 2.4vw, 1.45rem);
   font-weight: 900;
@@ -83,7 +83,7 @@
 }
 
 .hud__primary:hover:not(:disabled) {
-  background: #ffd166;
+  background: var(--color-gold-bright);
   transform: translateY(-1px) scale(1.02);
 }
 
@@ -91,9 +91,9 @@
   min-width: 4.25rem;
   min-height: 2.25rem;
   padding: 0.55rem 0.7rem;
-  border-radius: 0.45rem;
-  background: #f6e7c7;
-  color: #101828;
+  border-radius: var(--radius-sm);
+  background: var(--color-cream);
+  color: var(--color-ink);
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 800;
@@ -101,7 +101,7 @@
 }
 
 .hud__meta {
-  background: #8ef6c5;
+  background: var(--color-mint);
 }
 
 .hud__icon-button:hover:not(:disabled) {
@@ -140,19 +140,19 @@
 .launch-summary {
   width: min(38rem, 100%);
   padding: clamp(0.85rem, 2vw, 1.15rem);
-  border: 2px solid #ffd166;
-  border-radius: 0.5rem;
-  background: rgba(11, 16, 36, 0.88);
-  box-shadow: 0 0.8rem 2rem rgba(5, 7, 17, 0.35);
+  border: 2px solid var(--color-gold-bright);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  box-shadow: var(--shadow-panel);
   text-align: left;
 }
 
 .launch-summary--exploded {
-  border-color: #ff6b35;
+  border-color: var(--color-orange);
 }
 
 .launch-summary--orbit {
-  border-color: #8ef6c5;
+  border-color: var(--color-mint);
 }
 
 .launch-summary--exit {
@@ -162,7 +162,7 @@
 }
 
 .launch-summary__title {
-  color: #f6e7c7;
+  color: var(--color-cream);
   font-size: clamp(1.2rem, 3vw, 1.55rem);
   font-weight: 900;
   line-height: 1.1;
@@ -171,14 +171,14 @@
 
 .launch-summary__altitude {
   margin-top: 0.45rem;
-  color: #ffd166;
+  color: var(--color-gold-bright);
   font-size: clamp(0.95rem, 2vw, 1.1rem);
   font-weight: 800;
 }
 
 .launch-summary p {
   margin: 0.55rem 0 0;
-  color: #d8e2dc;
+  color: var(--color-body-copy);
   font-size: clamp(0.84rem, 1.8vw, 0.98rem);
   line-height: 1.35;
 }
@@ -192,19 +192,19 @@
 }
 
 .lesson-card {
-  --card-accent: #f4c95d;
-  --card-bg: #f6e7c7;
-  --art-bg: #293241;
+  --card-accent: var(--color-gold);
+  --card-bg: var(--color-cream);
+  --art-bg: var(--color-card-copy);
   display: grid;
   grid-template-rows: 4.35rem auto 1fr auto;
   gap: 0.6rem;
   min-height: 14.5rem;
   padding: 0.85rem;
   border: 0.22rem solid var(--card-accent);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   background: var(--card-bg);
-  box-shadow: 0.4rem 0.55rem 0 rgba(5, 7, 17, 0.48);
-  color: #101828;
+  box-shadow: 0.4rem 0.55rem 0 rgba(var(--rgb-shadow), 0.48);
+  color: var(--color-ink);
   cursor: pointer;
   text-align: left;
   opacity: 0;
@@ -224,8 +224,8 @@
 
 .lesson-card:hover,
 .lesson-card:focus-visible {
-  border-color: #ff6b35;
-  box-shadow: 0.48rem 0.68rem 0 rgba(5, 7, 17, 0.56);
+  border-color: var(--color-orange);
+  box-shadow: 0.48rem 0.68rem 0 rgba(var(--rgb-shadow), 0.56);
   outline: none;
   transform: translateY(-0.2rem) scale(1.015);
 }
@@ -246,11 +246,11 @@
   display: grid;
   place-items: center;
   min-height: 4.35rem;
-  border: 2px solid rgba(16, 24, 40, 0.55);
-  border-radius: 0.45rem;
+  border: 2px solid rgba(var(--rgb-ink), 0.55);
+  border-radius: var(--radius-sm);
   background:
-    radial-gradient(circle at 78% 22%, rgba(246, 231, 199, 0.22), transparent 1.9rem),
-    linear-gradient(135deg, var(--art-bg), #101828);
+    radial-gradient(circle at 78% 22%, rgba(var(--rgb-cream), 0.22), transparent 1.9rem),
+    linear-gradient(135deg, var(--art-bg), var(--color-ink));
   color: var(--card-accent);
 }
 
@@ -267,14 +267,14 @@
 }
 
 .lesson-card__title {
-  color: #101828;
+  color: var(--color-ink);
   font-size: clamp(1rem, 2.2vw, 1.15rem);
   font-weight: 1000;
   line-height: 1.15;
 }
 
 .lesson-card__description {
-  color: #293241;
+  color: var(--color-card-copy);
   font-size: 0.88rem;
   line-height: 1.28;
 }
@@ -282,63 +282,63 @@
 .lesson-card__effect {
   align-self: end;
   padding: 0.55rem;
-  border: 1px solid rgba(244, 201, 93, 0.86);
+  border: 1px solid rgba(var(--rgb-gold), 0.86);
   border-radius: 0.38rem;
-  background: #fff4d6;
-  color: #9b3d2e;
+  background: var(--color-card-effect-bg);
+  color: var(--color-card-effect-text);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.25;
 }
 
 .lesson-card--tuneEngineMix {
-  --card-accent: #ff6b35;
-  --art-bg: #3a1f36;
+  --card-accent: var(--color-orange);
+  --art-bg: var(--art-engine);
 }
 
 .lesson-card--improveFuelFlow {
-  --card-accent: #5ac8fa;
-  --art-bg: #17324a;
+  --card-accent: var(--color-lesson-fuel);
+  --art-bg: var(--art-fuel);
 }
 
 .lesson-card--salvageUsefulParts {
-  --card-accent: #8ef6c5;
-  --art-bg: #24351f;
+  --card-accent: var(--color-mint);
+  --art-bg: var(--art-salvage);
 }
 
 .lesson-card--stabilizeFins {
-  --card-accent: #7aa2ff;
-  --art-bg: #1f2d4a;
+  --card-accent: var(--color-lesson-guidance);
+  --art-bg: var(--art-guidance);
 }
 
 .lesson-card--fairNoseCone {
-  --card-accent: #a8ffd9;
-  --art-bg: #233844;
+  --card-accent: var(--color-lesson-aero);
+  --art-bg: var(--art-aero);
 }
 
 .lesson-card--cutDeadWeight {
-  --card-accent: #ffd166;
-  --art-bg: #3b2c1f;
+  --card-accent: var(--color-gold-bright);
+  --art-bg: var(--art-mass);
 }
 
 .lesson-card--standardizeAssembly {
-  --card-accent: #f4c95d;
-  --art-bg: #2b3242;
+  --card-accent: var(--color-gold);
+  --art-bg: var(--art-process);
 }
 
 .lesson-card--recruitSpecialist {
-  --card-accent: #cdb4ff;
-  --art-bg: #2b2746;
+  --card-accent: var(--color-lesson-specialist);
+  --art-bg: var(--art-specialist);
 }
 
 .lesson-card--documentEverything {
-  --card-accent: #f4c95d;
-  --art-bg: #352b22;
+  --card-accent: var(--color-gold);
+  --art-bg: var(--art-documentation);
 }
 
 .lesson-card--reinforceFrame {
-  --card-accent: #ff9f9f;
-  --art-bg: #332732;
+  --card-accent: var(--color-lesson-frame);
+  --art-bg: var(--art-frame);
 }
 
 .dom-menu {
@@ -359,7 +359,7 @@
 .dom-menu__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(5, 7, 17, 0.74);
+  background: var(--color-backdrop);
 }
 
 .dom-menu__panel {
@@ -368,15 +368,15 @@
   width: min(26rem, calc(100vw - 2rem));
   gap: 1rem;
   padding: 1.35rem;
-  border: 3px solid #f4c95d;
-  border-radius: 0.5rem;
-  background: rgba(16, 24, 40, 0.97);
-  box-shadow: 0 1rem 2.4rem rgba(5, 7, 17, 0.5);
+  border: 3px solid var(--color-gold);
+  border-radius: var(--radius-md);
+  background: var(--color-panel-strong);
+  box-shadow: var(--shadow-modal);
 }
 
 .dom-menu__panel h2 {
   margin: 0 0 0.25rem;
-  color: #f6e7c7;
+  color: var(--color-cream);
   font-size: clamp(1.45rem, 4vw, 2rem);
   line-height: 1;
   text-transform: uppercase;
@@ -385,18 +385,18 @@
 .dom-menu__panel button {
   min-height: 2.85rem;
   border: 0;
-  border-radius: 0.45rem;
-  color: #101828;
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
   cursor: pointer;
   font-weight: 900;
 }
 
 .dom-menu__reset {
-  background: #ff6b35;
+  background: var(--color-orange);
 }
 
 .dom-menu__close {
-  background: #f6e7c7;
+  background: var(--color-cream);
 }
 
 @media (max-width: 780px), (max-height: 560px) {
