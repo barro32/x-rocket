@@ -1,3 +1,4 @@
+import './DomUiView.css';
 import type { LaunchResult, LessonSpec, RocketStats, RolledRocketStats } from '../../sim/types';
 
 interface DomUiViewConfig {

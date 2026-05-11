@@ -12,6 +12,9 @@ interface LaunchVisualProfile {
   failedStat?: RocketStatId;
 }
 
+const ROCKET_ORIGIN_Y = 0.66;
+const MAX_NORMAL_TILT = 16;
+
 export class RocketView {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly outerFlame: Phaser.GameObjects.Triangle;
@@ -24,7 +27,7 @@ export class RocketView {
     private readonly hangarDoor: Phaser.Math.Vector2,
     private readonly launchPad: Phaser.Math.Vector2,
   ) {
-    this.sprite = this.scene.add.image(hangarDoor.x, hangarDoor.y, 'rocket').setScale(3).setOrigin(0.5, 1);
+    this.sprite = this.scene.add.image(hangarDoor.x, hangarDoor.y, 'rocket').setScale(3).setOrigin(0.5, ROCKET_ORIGIN_Y);
     this.outerFlame = this.scene.add.triangle(hangarDoor.x, hangarDoor.y + 18, 0, 0, 22, 58, 44, 0, 0xf15a24, 0.92);
     this.innerFlame = this.scene.add.triangle(hangarDoor.x, hangarDoor.y + 12, 0, 0, 12, 36, 24, 0, 0xffd166, 0.96);
     this.outerFlame.setDepth(this.sprite.depth - 1);
@@ -38,7 +41,8 @@ export class RocketView {
   resetToHangar(): void {
     this.scene.tweens.killTweensOf(this.sprite);
     this.stopBurn();
-    this.sprite.setTexture('rocket').setScale(3).setAlpha(1).setAngle(-90).setPosition(this.hangarDoor.x, this.hangarDoor.y);
+    this.sprite.setTexture('rocket').setOrigin(0.5, ROCKET_ORIGIN_Y).setScale(3).setAlpha(1).setAngle(-90);
+    this.setRocketBasePosition(this.hangarDoor.x, this.hangarDoor.y);
     this.syncFlamePosition();
     this.readyAtPad = false;
   }
@@ -49,17 +53,23 @@ export class RocketView {
     }
 
     this.resetToHangar();
-    await tween(this.scene, {
-      targets: this.sprite,
-      x: this.launchPad.x,
-      duration: 850,
-      ease: 'Sine.easeInOut',
+    await tweenProgress(this.scene, 850, (progress) => {
+      const eased = Phaser.Math.Easing.Sine.InOut(progress);
+      this.setRocketBasePosition(
+        Phaser.Math.Linear(this.hangarDoor.x, this.launchPad.x, eased),
+        Phaser.Math.Linear(this.hangarDoor.y, this.launchPad.y, eased),
+      );
+      this.syncFlamePosition();
     });
     await tween(this.scene, {
       targets: this.sprite,
       angle: 0,
       duration: 320,
       ease: 'Back.easeOut',
+      onUpdate: () => {
+        this.setRocketBasePosition(this.launchPad.x, this.launchPad.y);
+        this.syncFlamePosition();
+      },
     });
     this.readyAtPad = true;
   }
@@ -78,10 +88,11 @@ export class RocketView {
 
     this.sprite
       .setTexture('rocket')
+      .setOrigin(0.5, ROCKET_ORIGIN_Y)
       .setScale(3)
       .setAngle(-90)
-      .setPosition(this.hangarDoor.x, this.hangarDoor.y)
       .setAlpha(0.2);
+    this.setRocketBasePosition(this.hangarDoor.x, this.hangarDoor.y);
     this.syncFlamePosition();
     this.readyAtPad = false;
 
@@ -92,12 +103,13 @@ export class RocketView {
       ease: 'Sine.easeOut',
     });
 
-    await tween(this.scene, {
-      targets: this.sprite,
-      x: this.launchPad.x,
-      duration: 850,
-      ease: 'Sine.easeInOut',
-      onUpdate: () => this.syncFlamePosition(),
+    await tweenProgress(this.scene, 850, (progress) => {
+      const eased = Phaser.Math.Easing.Sine.InOut(progress);
+      this.setRocketBasePosition(
+        Phaser.Math.Linear(this.hangarDoor.x, this.launchPad.x, eased),
+        Phaser.Math.Linear(this.hangarDoor.y, this.launchPad.y, eased),
+      );
+      this.syncFlamePosition();
     });
 
     await tween(this.scene, {
@@ -105,6 +117,10 @@ export class RocketView {
       angle: 0,
       duration: 320,
       ease: 'Back.easeOut',
+      onUpdate: () => {
+        this.setRocketBasePosition(this.launchPad.x, this.launchPad.y);
+        this.syncFlamePosition();
+      },
     });
 
     this.readyAtPad = true;
@@ -122,19 +138,19 @@ export class RocketView {
       duration: this.ignitionDuration(profile),
       onUpdate: (tween) => {
         const progress = tween.progress;
-        this.sprite.setX(this.launchPad.x + Math.sin(progress * Math.PI * 18) * shake);
+        this.setRocketBasePosition(this.launchPad.x + Math.sin(progress * Math.PI * 18) * shake, this.launchPad.y);
         this.syncFlamePosition();
       },
     });
-    this.sprite.setX(this.launchPad.x);
+    this.setRocketBasePosition(this.launchPad.x, this.launchPad.y);
   }
 
   async flyTo(altitudeMeters: number, profile: LaunchVisualProfile): Promise<Phaser.Math.Vector2> {
     const visualRise = altitudeToPixels(altitudeMeters);
     if (visualRise <= 0) {
       this.stopBurn();
-      this.sprite.setPosition(this.launchPad.x, this.launchPad.y);
       this.sprite.setAngle(0);
+      this.setRocketBasePosition(this.launchPad.x, this.launchPad.y);
       this.syncFlamePosition();
       return new Phaser.Math.Vector2(this.sprite.x, this.sprite.y);
     }
@@ -158,15 +174,21 @@ export class RocketView {
 
     await tweenProgress(this.scene, duration, (progress) => {
       const eased = ascentProgress(progress, poweredEnd);
+      const launchWeight = Phaser.Math.Clamp(eased / 0.18, 0, 1);
       const aeroFlutter = Math.sin(progress * Math.PI * (7 + (1 - aerodynamics) * 8)) * buffeting * Math.sin(progress * Math.PI);
       const guidanceWander = Math.sin(progress * Math.PI * 2.3) * wobble * (1 - eased * 0.48);
       const failurePull = failureDrift(profile.failedStat, progress);
       const driftWave = guidanceWander + aeroFlutter + failurePull;
-      this.sprite.setPosition(
-        this.launchPad.x + driftX * eased + driftWave,
-        Phaser.Math.Linear(this.launchPad.y, targetY, eased),
+      const baseX = this.launchPad.x + driftX * eased + driftWave * launchWeight;
+      const baseY = Phaser.Math.Linear(this.launchPad.y, targetY, eased);
+      const normalTilt = Phaser.Math.Clamp(driftX * 0.018 * eased + driftWave * 0.16 * launchWeight, -MAX_NORMAL_TILT, MAX_NORMAL_TILT);
+      const failedTilt = failureAngle(profile.failedStat, progress);
+
+      this.sprite.setAngle(Phaser.Math.Clamp(normalTilt + failedTilt, -34, 34));
+      this.setRocketBasePosition(
+        baseX,
+        baseY,
       );
-      this.sprite.setAngle(Phaser.Math.Clamp(driftWave * 0.75 + driftX * 0.026 + failureAngle(profile.failedStat, progress), -48, 48));
       this.updateFlightFlame(profile, progress, poweredEnd);
       this.syncFlamePosition();
     });
@@ -176,7 +198,7 @@ export class RocketView {
   }
 
   ignitionDuration(profile: LaunchVisualProfile): number {
-    return Phaser.Math.Clamp(55 + profile.fuel * 2, 70, 250);
+    return Phaser.Math.Clamp(260 + profile.fuel * 3.2, 300, 620);
   }
 
   flightDuration(altitudeMeters: number, profile: LaunchVisualProfile): number {
@@ -186,16 +208,16 @@ export class RocketView {
     const aerodynamics = statRatio(profile.aerodynamics);
     const lightness = statRatio(profile.lightness);
     return Phaser.Math.Clamp(
-      760 + visualRise * (1.95 - thrust * 0.32 - lightness * 0.28 - aerodynamics * 0.22) + fuel * 260,
-      820,
-      3200,
+      980 + visualRise * (2.32 - thrust * 0.36 - lightness * 0.24 - aerodynamics * 0.18) + fuel * 340,
+      1250,
+      4200,
     );
   }
 
   explode(): Phaser.Math.Vector2 {
     this.stopBurn();
     this.readyAtPad = false;
-    this.sprite.setTexture('explosion').setScale(4).setAlpha(1);
+    this.sprite.setTexture('explosion').setOrigin(0.5, 0.5).setScale(4).setAlpha(1);
     return new Phaser.Math.Vector2(this.sprite.x, this.sprite.y);
   }
 
@@ -290,8 +312,28 @@ export class RocketView {
   }
 
   private syncFlamePosition(): void {
-    this.outerFlame.setPosition(this.sprite.x, this.sprite.y + 10);
-    this.innerFlame.setPosition(this.sprite.x, this.sprite.y + 12);
+    const base = this.rocketBasePosition();
+    const radians = Phaser.Math.DegToRad(this.sprite.angle);
+    const downwardX = -Math.sin(radians);
+    const downwardY = Math.cos(radians);
+    this.outerFlame.setPosition(base.x + downwardX * 10, base.y + downwardY * 10).setAngle(this.sprite.angle);
+    this.innerFlame.setPosition(base.x + downwardX * 12, base.y + downwardY * 12).setAngle(this.sprite.angle);
+  }
+
+  private setRocketBasePosition(baseX: number, baseY: number): void {
+    const offset = this.rotatedBaseOffset();
+    this.sprite.setPosition(baseX - offset.x, baseY - offset.y);
+  }
+
+  private rocketBasePosition(): Phaser.Math.Vector2 {
+    const offset = this.rotatedBaseOffset();
+    return new Phaser.Math.Vector2(this.sprite.x + offset.x, this.sprite.y + offset.y);
+  }
+
+  private rotatedBaseOffset(): Phaser.Math.Vector2 {
+    const radians = Phaser.Math.DegToRad(this.sprite.angle);
+    const localY = (1 - this.sprite.originY) * this.sprite.height * this.sprite.scaleY;
+    return new Phaser.Math.Vector2(-Math.sin(radians) * localY, Math.cos(radians) * localY);
   }
 }
 
@@ -310,7 +352,7 @@ function statRatio(value: number): number {
 function ascentProgress(progress: number, poweredEnd: number): number {
   if (progress <= poweredEnd) {
     const poweredProgress = progress / poweredEnd;
-    return 0.66 * Math.pow(poweredProgress, 1.55);
+    return 0.66 * Math.pow(poweredProgress, 2.08);
   }
 
   const coastProgress = (progress - poweredEnd) / Math.max(0.01, 1 - poweredEnd);

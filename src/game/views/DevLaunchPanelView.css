@@ -1,0 +1,103 @@
+.dev-launch-panel {
+  position: absolute;
+  top: 5.1rem;
+  right: clamp(0.75rem, 2vw, 1.5rem);
+  z-index: 18;
+  display: grid;
+  gap: 0.7rem;
+  width: min(23rem, calc(100vw - 1.5rem));
+  padding: 0.8rem;
+  border: 1px solid rgba(142, 246, 197, 0.28);
+  border-radius: 0.5rem;
+  background: rgba(5, 7, 17, 0.86);
+  box-shadow: 0 0.8rem 1.8rem rgba(5, 7, 17, 0.34);
+  color: #f6e7c7;
+  font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.35rem);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.dev-launch-panel--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.dev-launch-panel__header,
+.dev-launch-panel__row {
+  display: grid;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.dev-launch-panel__header {
+  grid-template-columns: 1fr auto;
+}
+
+.dev-launch-panel__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #8ef6c5;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.dev-launch-panel__toggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #8ef6c5;
+}
+
+.dev-launch-panel__reset {
+  min-height: 1.9rem;
+  padding: 0.35rem 0.55rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: #f6e7c7;
+  color: #101828;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.dev-launch-panel__controls {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.dev-launch-panel__row {
+  grid-template-columns: 3.25rem minmax(0, 1fr) 2rem;
+}
+
+.dev-launch-panel__label,
+.dev-launch-panel__value {
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.dev-launch-panel__label {
+  color: #d8e2dc;
+}
+
+.dev-launch-panel__value {
+  color: #ffd166;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dev-launch-panel__slider {
+  width: 100%;
+  accent-color: #ff6b35;
+}
+
+@media (max-width: 780px), (max-height: 560px) {
+  .dev-launch-panel {
+    top: 8.25rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+  }
+}

@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-05-10
+Last updated: 2026-05-11
 
 ## Current Slice
 
@@ -66,17 +66,19 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 ## UI State
 
 - Main HUD is now a DOM overlay above Phaser, with responsive layout for narrow and short windows.
-- Rocket rolls from hangar to pad, launches upward, and the camera follows. Launch animation now uses rolled stats for clearer physical presentation: thrust affects acceleration/flame size, fuel affects burn duration/cutoff, aerodynamics/guidance/reliability affect wobble and drift, and failed systems add phase-specific instability.
+- DOM overlay styles are split by owner: global base styles live in `src/styles/base.css`, while `DomUiView`, `DomMetaProgressView`, and `DevLaunchPanelView` import their own adjacent CSS files.
+- Rocket rolls from hangar to pad, launches upward, and the camera follows. Launch animation now uses rolled stats for clearer physical presentation: thrust affects acceleration/flame size, fuel affects burn duration/cutoff, aerodynamics/guidance/reliability affect wobble and drift, and failed systems add phase-specific instability. Takeoff now has a slower ignition/ascent ramp, body-centered shake, and flame alignment that follows rocket tilt.
 - Launch summary and lesson cards are DOM overlays with CSS-driven responsive grid/stack behavior. Phaser still handles world, rocket, camera, and effects.
 - Lesson cards show exact current effect values from active meta upgrades instead of vague scaling labels.
-- Meta upgrades are displayed as a DOM/SVG bankruptcy review overlay with an authored compass graph: root centered, economy west, flight east, and review/knowledge south.
+- Meta upgrades are displayed as a DOM/SVG bankruptcy review overlay with an authored compass graph: root centered, economy west, flight east, and review/knowledge south. Node details and purchase actions now open in a concise node-local popover, with a mobile bottom-sheet layout and purchase/unlock feedback animations.
 - Dev stats toggle with `D`.
+- `D` also opens a launch tuning panel with stat sliders. When override is enabled, launches use the slider stats for testing while saved rocket stats remain unchanged.
 - Global menu is a DOM modal and includes reset game.
 
 ## Known Near-Term Work
 
-- Add clearer feedback when a meta node is unaffordable or locked.
 - Continue tuning DOM/SVG meta graph readability, especially small-window graph scrolling and node spacing.
+- Continue tuning meta upgrade wording so every popover stays short and action-focused.
 - Replace placeholder procedural art with a cohesive pixel art direction.
 - Orbit unlock exists, but orbit gameplay is not implemented.
 

@@ -1,5 +1,6 @@
 import { isBankrupt } from '../../sim/game';
 import { isMetaUpgradeUnlocked, metaUpgradeById, metaUpgradeCost, metaUpgradeSpecs } from '../../sim/metaUpgrades';
+import './DomMetaProgressView.css';
 import type { GameState, MetaUpgradeId } from '../../sim/types';
 
 interface DomMetaProgressViewConfig {

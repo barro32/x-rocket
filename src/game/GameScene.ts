@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { buyMetaUpgrade, claimBankruptcyReward, chooseLesson, createInitialState, isBankrupt, launchCost, restartCompany, simulateLaunch } from '../sim/game';
 import { lessonById, lessonEffectText } from '../sim/lessons';
 import { clearSave, loadGame, saveGame } from '../sim/save';
-import type { GameState } from '../sim/types';
+import type { GameState, RocketStats } from '../sim/types';
 import { DomMetaProgressView } from './views/DomMetaProgressView';
+import { DevLaunchPanelView } from './views/DevLaunchPanelView';
 import { DevStatsView } from './views/DevStatsView';
 import { DomUiView } from './views/DomUiView';
 import { EffectsView } from './views/EffectsView';
@@ -15,10 +16,12 @@ export class GameScene extends Phaser.Scene {
   private world!: WorldView;
   private rocket!: RocketView;
   private ui!: DomUiView;
+  private devLaunchPanel!: DevLaunchPanelView;
   private devStats!: DevStatsView;
   private metaProgress!: DomMetaProgressView;
   private effects!: EffectsView;
   private nextLaunchPrep?: Promise<void>;
+  private devRocketStats?: RocketStats;
   private busy = false;
 
   constructor() {
@@ -35,6 +38,12 @@ export class GameScene extends Phaser.Scene {
       onMeta: () => this.openMetaProgress(),
       onMenuReset: () => this.resetGame(),
     });
+    this.devLaunchPanel = new DevLaunchPanelView({
+      onChange: (stats) => {
+        this.devRocketStats = stats;
+        this.renderState();
+      },
+    });
     this.devStats = new DevStatsView(this);
     this.metaProgress = new DomMetaProgressView({
       onBuy: (id) => this.buyMeta(id),
@@ -44,7 +53,10 @@ export class GameScene extends Phaser.Scene {
     this.rocket.resetToHangar();
     this.cameras.main.setBounds(0, -3200, 1280, 3920);
     this.resetCamera();
-    this.input.keyboard?.on('keydown-D', () => this.devStats.toggle());
+    this.input.keyboard?.on('keydown-D', () => {
+      this.devStats.toggle();
+      this.devLaunchPanel.toggle();
+    });
     this.renderState();
 
     if (this.state.pendingLessonChoices.length > 0) {
@@ -68,12 +80,20 @@ export class GameScene extends Phaser.Scene {
   private async launchSequence(): Promise<void> {
     this.busy = true;
     this.renderState();
-    this.ui.beginLaunchRoll(this.state.rocketStats.reliability);
+    const launchStats = this.effectiveRocketStats();
+    this.ui.beginLaunchRoll(launchStats.reliability);
 
     await this.rocket.rolloutToPad();
 
     const beforeLaunches = this.state.launches;
-    this.state = simulateLaunch(this.state);
+    const nextState = simulateLaunch({
+      ...this.state,
+      rocketStats: launchStats,
+    });
+    this.state = this.devRocketStats ? {
+      ...nextState,
+      rocketStats: this.state.rocketStats,
+    } : nextState;
     if (this.state.launches === beforeLaunches) {
       this.busy = false;
       this.persistAndRender();
@@ -89,13 +109,13 @@ export class GameScene extends Phaser.Scene {
 
     const launchProfile = {
       ...result.rolledStats,
-      reliability: this.state.rocketStats.reliability / 99,
+      reliability: launchStats.reliability / 99,
       outcome: result.outcome,
       failedStat: result.failedStat,
     };
     const launchRollDuration = this.rocket.ignitionDuration(launchProfile) + this.rocket.flightDuration(result.altitudeMeters, launchProfile);
 
-    this.ui.animateLaunchRoll(result.rolledStats, this.state.rocketStats.reliability, launchRollDuration);
+    this.ui.animateLaunchRoll(result.rolledStats, launchStats.reliability, launchRollDuration);
 
     this.effects.ignition(this.world.launchPad.x, this.world.launchPad.y, {
       thrust: result.rolledStats.thrust,
@@ -121,7 +141,7 @@ export class GameScene extends Phaser.Scene {
       this.nextLaunchPrep = undefined;
     });
 
-    this.ui.endLaunchRoll(this.state.rocketStats);
+    this.ui.endLaunchRoll(this.effectiveRocketStats());
     this.persistAndRender();
     await wait(this, 360);
     if (this.state.pendingLessonChoices.length > 0) {
@@ -135,7 +155,7 @@ export class GameScene extends Phaser.Scene {
     await this.ui.showLessonChoices(
       this.state.pendingLessonChoices.map((lessonId) => ({
         spec: lessonById[lessonId],
-        effectText: lessonEffectText(lessonId, this.state.metaUpgrades, this.state.rocketStats),
+        effectText: lessonEffectText(lessonId, this.state.metaUpgrades, this.effectiveRocketStats()),
       })),
       this.state.lastLaunch,
       (index) => void this.pickLesson(index),
@@ -201,6 +221,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.state = restartCompany(this.state);
+    this.devRocketStats = undefined;
+    this.devLaunchPanel.clearOverride();
     this.rocket.resetToHangar();
     this.resetCamera();
     this.persistAndRender();
@@ -217,6 +239,8 @@ export class GameScene extends Phaser.Scene {
     this.ui.destroyLessonChoices();
     this.ui.hideMenu();
     this.state = createInitialState();
+    this.devRocketStats = undefined;
+    this.devLaunchPanel.clearOverride();
     this.rocket.resetToHangar();
     this.resetCamera();
     this.metaProgress.hide();
@@ -234,16 +258,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderState(): void {
+    const rocketStats = this.effectiveRocketStats();
     this.world.setCompany(this.state.companyIndex);
     this.ui.update({
       money: this.state.money,
       launchCost: launchCost(this.state),
       bankrupt: isBankrupt(this.state),
       locked: this.busy || this.state.pendingLessonChoices.length > 0,
-      stats: this.state.rocketStats,
+      stats: rocketStats,
     });
-    this.devStats.update(this.state);
+    this.devLaunchPanel.update(this.state.rocketStats);
+    this.devStats.update({
+      ...this.state,
+      rocketStats,
+    });
     this.metaProgress.update(this.state);
+  }
+
+  private effectiveRocketStats(): RocketStats {
+    return this.devRocketStats ?? this.state.rocketStats;
   }
 }
 
