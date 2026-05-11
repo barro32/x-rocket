@@ -497,6 +497,10 @@ button {
   font-weight: 800;
 }
 
+.meta-progress__knowledge--pulse {
+  animation: meta-knowledge-pulse 420ms ease-out;
+}
+
 .meta-progress__continue,
 .meta-progress__buy {
   min-height: 2.8rem;
@@ -514,13 +518,14 @@ button {
 }
 
 .meta-progress__body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .meta-progress__graph {
   position: relative;
+  height: 100%;
   min-height: 0;
   overflow: auto;
   cursor: grab;
@@ -568,34 +573,37 @@ button {
   position: absolute;
   display: grid;
   place-items: center;
-  width: 6.25rem;
-  min-height: 6.25rem;
-  padding: 0.55rem 0.45rem;
-  border: 4px solid #f4c95d;
+  width: 6.45rem;
+  min-height: 6.45rem;
+  padding: 0.75rem;
+  border: 3px solid rgba(244, 201, 93, 0.9);
   border-radius: 50%;
-  background: #f6e7c7;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.34), transparent 34%),
+    #f6e7c7;
   color: #101828;
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.08;
   text-align: center;
   transform: translate(-50%, -50%);
-  transition: border-color 120ms ease, box-shadow 120ms ease, filter 120ms ease, transform 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease, filter 120ms ease;
 }
 
 .meta-node:hover,
 .meta-node:focus-visible,
 .meta-node--selected {
   border-color: #ff6b35;
-  box-shadow: 0 0 0 0.25rem rgba(255, 107, 53, 0.22);
+  box-shadow: 0 0 0 0.25rem rgba(255, 107, 53, 0.24), 0 0 1.35rem rgba(255, 107, 53, 0.22);
   outline: none;
-  transform: translate(-50%, -50%) scale(1.04);
 }
 
 .meta-node--locked {
-  border-color: #6c7487;
-  background: #30394d;
+  border-color: rgba(108, 116, 135, 0.78);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.08), transparent 36%),
+    #30394d;
   color: #aab2c5;
 }
 
@@ -605,83 +613,82 @@ button {
 
 .meta-node--affordable {
   border-color: #ff6b35;
-  background: #ffd166;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.36), transparent 34%),
+    #ffd166;
+  box-shadow: 0 0 0 0.2rem rgba(255, 209, 102, 0.2), 0 0 1.6rem rgba(255, 107, 53, 0.24);
 }
 
 .meta-node--maxed {
   border-color: #1bd88f;
-  background: #8ef6c5;
-}
-
-.meta-node__name,
-.meta-node__level,
-.meta-node__cost {
-  display: block;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.32), transparent 34%),
+    #8ef6c5;
 }
 
 .meta-node__name {
-  max-width: 5.2rem;
+  position: relative;
+  display: block;
+  max-width: 5.25rem;
 }
 
-.meta-node__level,
-.meta-node__cost {
-  margin-top: 0.18rem;
-  font-size: 0.68rem;
+.meta-node--purchased {
+  animation: meta-node-purchased 560ms ease-out;
 }
 
-.meta-progress__details {
+.meta-node--newly-unlocked {
+  animation: meta-node-newly-unlocked 760ms ease-out;
+}
+
+.meta-progress__popover {
+  position: absolute;
+  z-index: 4;
   display: grid;
-  align-content: start;
-  gap: 0.8rem;
-  padding: clamp(1rem, 2vw, 1.5rem);
-  border-left: 1px solid rgba(246, 231, 199, 0.14);
-  background: rgba(11, 16, 36, 0.68);
-  overflow-y: auto;
+  gap: 0.65rem;
+  width: min(19rem, calc(100vw - 2rem));
+  padding: 0.9rem;
+  border: 2px solid rgba(244, 201, 93, 0.72);
+  border-radius: 0.5rem;
+  background: rgba(11, 16, 36, 0.96);
+  box-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.35rem);
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.meta-progress__details h3 {
+.meta-progress__popover--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.meta-progress__popover h3 {
   margin: 0;
   color: #f6e7c7;
-  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  font-size: 1.05rem;
   line-height: 1.1;
 }
 
-.meta-progress__details-meta {
+.meta-progress__popover-meta {
   color: #8ef6c5;
+  font-size: 0.84rem;
   font-weight: 900;
 }
 
-.meta-progress__details p,
-.meta-progress__prerequisites,
-.meta-progress__status {
+.meta-progress__popover p {
   margin: 0;
   color: #d8e2dc;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   line-height: 1.35;
 }
 
-.meta-progress__unlocks {
+.meta-progress__popover-unlocks {
   padding: 0.7rem;
   border: 1px solid rgba(244, 201, 93, 0.45);
   border-radius: 0.45rem;
   background: rgba(255, 244, 214, 0.08);
   color: #f6e7c7;
-}
-
-.meta-progress__status {
-  font-weight: 900;
-}
-
-.meta-progress__status[data-status="locked"] {
-  color: #aab2c5;
-}
-
-.meta-progress__status[data-status="affordable"] {
-  color: #ffd166;
-}
-
-.meta-progress__status[data-status="maxed"] {
-  color: #8ef6c5;
 }
 
 .meta-progress__buy {
@@ -692,6 +699,42 @@ button {
 .meta-progress__buy:disabled {
   cursor: default;
   opacity: 0.45;
+}
+
+@keyframes meta-knowledge-pulse {
+  0% {
+    color: #ffffff;
+    transform: translateY(-0.08rem);
+  }
+
+  100% {
+    color: #8ef6c5;
+    transform: translateY(0);
+  }
+}
+
+@keyframes meta-node-purchased {
+  0% {
+    box-shadow: 0 0 0 0 rgba(142, 246, 197, 0.9), 0 0 0 0 rgba(244, 201, 93, 0.45);
+    filter: brightness(1.45);
+  }
+
+  100% {
+    box-shadow: 0 0 0 1.2rem rgba(142, 246, 197, 0), 0 0 2.4rem 1.8rem rgba(244, 201, 93, 0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes meta-node-newly-unlocked {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+
+  35% {
+    filter: brightness(1.75);
+    box-shadow: 0 0 0 0.35rem rgba(142, 246, 197, 0.36), 0 0 1.8rem rgba(142, 246, 197, 0.45);
+  }
 }
 
 @media (max-width: 780px), (max-height: 560px) {
@@ -737,14 +780,20 @@ button {
   }
 
   .meta-progress__body {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(18rem, 1fr) auto;
+    min-height: 0;
   }
 
-  .meta-progress__details {
-    max-height: 15rem;
-    border-left: 0;
-    border-top: 1px solid rgba(246, 231, 199, 0.14);
+  .meta-progress__popover {
+    position: fixed;
+    left: 0.75rem !important;
+    right: 0.75rem;
+    top: auto !important;
+    bottom: 0.75rem;
+    width: auto;
+    max-height: min(17rem, calc(100vh - 7rem));
+    overflow-y: auto;
+    border-color: rgba(244, 201, 93, 0.86);
+    border-radius: 0.6rem;
   }
 
 }

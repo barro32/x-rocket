@@ -44,22 +44,24 @@ export class DomMetaProgressView {
   private readonly graphSpacer: HTMLDivElement;
   private readonly graphSvg: SVGSVGElement;
   private readonly nodesLayer: HTMLDivElement;
-  private readonly detailsTitle: HTMLHeadingElement;
-  private readonly detailsMeta: HTMLDivElement;
-  private readonly detailsDescription: HTMLParagraphElement;
-  private readonly detailsUnlocks: HTMLParagraphElement;
-  private readonly detailsPrerequisites: HTMLDivElement;
-  private readonly detailsStatus: HTMLDivElement;
+  private readonly popover: HTMLDivElement;
+  private readonly popoverTitle: HTMLHeadingElement;
+  private readonly popoverMeta: HTMLDivElement;
+  private readonly popoverDescription: HTMLParagraphElement;
+  private readonly popoverUnlocks: HTMLParagraphElement;
   private readonly buyButton: HTMLButtonElement;
   private readonly continueButton: HTMLButtonElement;
 
   private currentState?: GameState;
+  private popoverOpen = false;
   private selectedNodeId: MetaUpgradeId = 'blackBoxRecovery';
   private isPanning = false;
   private panStartX = 0;
   private panStartY = 0;
   private panStartScrollLeft = 0;
   private panStartScrollTop = 0;
+  private viewportPaddingX = 0;
+  private viewportPaddingY = 0;
 
   constructor(config: DomMetaProgressViewConfig) {
     const app = document.querySelector<HTMLDivElement>('#app');
@@ -85,16 +87,14 @@ export class DomMetaProgressView {
             <div class="meta-progress__graph-spacer"></div>
             <svg class="meta-progress__links" viewBox="0 0 ${graphWidth} ${graphHeight}" aria-hidden="true"></svg>
             <div class="meta-progress__nodes"></div>
+            <div class="meta-progress__popover" aria-live="polite" aria-hidden="true">
+              <h3></h3>
+              <div class="meta-progress__popover-meta"></div>
+              <p class="meta-progress__popover-description"></p>
+              <p class="meta-progress__popover-unlocks"></p>
+              <button class="meta-progress__buy" type="button">Buy Upgrade</button>
+            </div>
           </div>
-          <aside class="meta-progress__details" aria-live="polite">
-            <h3></h3>
-            <div class="meta-progress__details-meta"></div>
-            <p class="meta-progress__description"></p>
-            <p class="meta-progress__unlocks"></p>
-            <div class="meta-progress__prerequisites"></div>
-            <div class="meta-progress__status"></div>
-            <button class="meta-progress__buy" type="button">Buy Upgrade</button>
-          </aside>
         </div>
       </section>
     `;
@@ -106,12 +106,11 @@ export class DomMetaProgressView {
     this.graphSpacer = this.requireElement('.meta-progress__graph-spacer');
     this.graphSvg = this.requireElement('.meta-progress__links');
     this.nodesLayer = this.requireElement('.meta-progress__nodes');
-    this.detailsTitle = this.requireElement('.meta-progress__details h3');
-    this.detailsMeta = this.requireElement('.meta-progress__details-meta');
-    this.detailsDescription = this.requireElement('.meta-progress__description');
-    this.detailsUnlocks = this.requireElement('.meta-progress__unlocks');
-    this.detailsPrerequisites = this.requireElement('.meta-progress__prerequisites');
-    this.detailsStatus = this.requireElement('.meta-progress__status');
+    this.popover = this.requireElement('.meta-progress__popover');
+    this.popoverTitle = this.requireElement('.meta-progress__popover h3');
+    this.popoverMeta = this.requireElement('.meta-progress__popover-meta');
+    this.popoverDescription = this.requireElement('.meta-progress__popover-description');
+    this.popoverUnlocks = this.requireElement('.meta-progress__popover-unlocks');
     this.buyButton = this.requireElement('.meta-progress__buy');
     this.continueButton = this.requireElement('.meta-progress__continue');
 
@@ -124,54 +123,72 @@ export class DomMetaProgressView {
     this.nodesLayer.style.width = `${graphWidth}px`;
     this.nodesLayer.style.height = `${graphHeight}px`;
     this.bindPanEvents();
-    this.buildGraph(config);
+    this.buildGraph();
+    window.addEventListener('resize', () => {
+      if (this.root.classList.contains('meta-progress--visible')) {
+        this.centerGraphWhenReady();
+      }
+    });
   }
 
   show(state: GameState): void {
     this.update(state);
     this.root.setAttribute('aria-hidden', 'false');
     this.root.classList.add('meta-progress--visible');
-    requestAnimationFrame(() => this.centerOnNode('blackBoxRecovery'));
+    this.centerGraphWhenReady();
   }
 
   hide(): void {
     this.root.classList.remove('meta-progress--visible');
+    this.closePopover();
     window.setTimeout(() => this.root.setAttribute('aria-hidden', 'true'), 160);
   }
 
   update(state: GameState): void {
+    const previousState = this.currentState;
     this.currentState = state;
     this.knowledgeText.textContent = `Meta Knowledge: ${state.knowledge}`;
     this.continueButton.textContent = isBankrupt(state) ? 'Start Next Company' : 'Close';
     this.renderLinks(state);
     this.renderNodes(state);
-    this.renderDetails();
+    this.renderPopover();
+    this.renderPurchaseFeedback(previousState, state);
   }
 
-  private buildGraph(config: DomMetaProgressViewConfig): void {
+  private buildGraph(): void {
     metaUpgradeSpecs.forEach((spec) => {
       const position = graphPoint(spec.id);
       const button = document.createElement('button');
       button.className = 'meta-node';
       button.type = 'button';
       button.dataset.nodeId = spec.id;
-      button.style.left = `${position.x}px`;
-      button.style.top = `${position.y}px`;
-      button.addEventListener('mouseenter', () => this.selectNode(spec.id));
-      button.addEventListener('focus', () => this.selectNode(spec.id));
+      button.style.left = `${position.x + this.viewportPaddingX}px`;
+      button.style.top = `${position.y + this.viewportPaddingY}px`;
+      button.addEventListener('focus', () => this.openPopover(spec.id));
       button.addEventListener('click', () => {
-        this.selectNode(spec.id);
-        if (this.currentState && nodeState(this.currentState, spec.id).affordable) {
-          config.onBuy(spec.id);
-        }
+        this.openPopover(spec.id);
       });
       this.nodesLayer.append(button);
+    });
+
+    this.graphElement.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('.meta-node, .meta-progress__popover')) {
+        return;
+      }
+
+      this.closePopover();
+    });
+
+    this.graphElement.addEventListener('scroll', () => {
+      if (this.popoverOpen) {
+        this.positionPopover(this.selectedNodeId);
+      }
     });
   }
 
   private bindPanEvents(): void {
     this.graphElement.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0 || (event.target as HTMLElement).closest('.meta-node')) {
+      if (event.button !== 0 || (event.target as HTMLElement).closest('.meta-node, .meta-progress__popover')) {
         return;
       }
 
@@ -212,17 +229,49 @@ export class DomMetaProgressView {
 
   private centerOnNode(id: MetaUpgradeId): void {
     const position = graphPoint(id);
-    this.graphElement.scrollLeft = position.x - this.graphElement.clientWidth / 2;
-    this.graphElement.scrollTop = position.y - this.graphElement.clientHeight / 2;
+    const left = Math.max(0, position.x);
+    const top = Math.max(0, position.y);
+    this.graphElement.scrollLeft = left;
+    this.graphElement.scrollTop = top;
+  }
+
+  private centerGraphWhenReady(): void {
+    const center = (): void => {
+      this.layoutGraph();
+      this.centerOnNode('blackBoxRecovery');
+    };
+    requestAnimationFrame(() => requestAnimationFrame(center));
+    window.setTimeout(center, 40);
+    window.setTimeout(center, 180);
+  }
+
+  private layoutGraph(): void {
+    this.viewportPaddingX = this.graphElement.clientWidth / 2;
+    this.viewportPaddingY = this.graphElement.clientHeight / 2;
+    const width = graphWidth + this.graphElement.clientWidth;
+    const height = graphHeight + this.graphElement.clientHeight;
+    this.graphSpacer.style.width = `${width}px`;
+    this.graphSpacer.style.height = `${height}px`;
+    this.graphSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    this.graphSvg.style.width = `${width}px`;
+    this.graphSvg.style.height = `${height}px`;
+    this.nodesLayer.style.width = `${width}px`;
+    this.nodesLayer.style.height = `${height}px`;
+
+    if (this.currentState) {
+      this.renderLinks(this.currentState);
+      this.renderNodes(this.currentState);
+      this.renderPopover();
+    }
   }
 
   private renderLinks(state: GameState): void {
     this.graphSvg.replaceChildren();
 
     metaUpgradeSpecs.forEach((spec) => {
-      const to = graphPoint(spec.id);
+      const to = this.graphPoint(spec.id);
       (spec.prerequisites ?? []).forEach((prerequisite) => {
-        const from = graphPoint(prerequisite);
+        const from = this.graphPoint(prerequisite);
         const active = state.metaUpgrades[prerequisite] > 0;
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', `${from.x}`);
@@ -243,46 +292,110 @@ export class DomMetaProgressView {
       const id = button.dataset.nodeId as MetaUpgradeId;
       const spec = metaUpgradeById[id];
       const view = nodeState(state, id);
+      const position = this.graphPoint(id);
       button.className = 'meta-node';
       button.classList.add(`meta-node--${view.status}`);
-      if (id === this.selectedNodeId) {
+      button.style.left = `${position.x}px`;
+      button.style.top = `${position.y}px`;
+      if (this.popoverOpen && id === this.selectedNodeId) {
         button.classList.add('meta-node--selected');
       }
       button.setAttribute('aria-disabled', `${!view.affordable}`);
       button.innerHTML = `
         <span class="meta-node__name">${escapeHtml(spec.name)}</span>
-        <span class="meta-node__level">${view.level}/${spec.maxLevel}</span>
-        <span class="meta-node__cost">${view.maxed ? 'MAX' : `${view.cost}K`}</span>
       `;
     });
   }
 
-  private selectNode(id: MetaUpgradeId): void {
+  private openPopover(id: MetaUpgradeId): void {
     this.selectedNodeId = id;
+    this.popoverOpen = true;
     if (this.currentState) {
       this.renderNodes(this.currentState);
-      this.renderDetails();
+      this.renderPopover();
     }
   }
 
-  private renderDetails(): void {
-    if (!this.currentState) {
+  private closePopover(): void {
+    this.popoverOpen = false;
+    this.popover.classList.remove('meta-progress__popover--visible');
+    this.popover.setAttribute('aria-hidden', 'true');
+    if (this.currentState) {
+      this.renderNodes(this.currentState);
+    }
+  }
+
+  private renderPopover(): void {
+    if (!this.currentState || !this.popoverOpen) {
       return;
     }
 
     const spec = metaUpgradeById[this.selectedNodeId];
     const view = nodeState(this.currentState, this.selectedNodeId);
-    const prerequisites = (spec.prerequisites ?? []).map((id) => metaUpgradeById[id].name).join(', ') || 'None';
 
-    this.detailsTitle.textContent = spec.name;
-    this.detailsMeta.textContent = `Level ${view.level}/${spec.maxLevel}`;
-    this.detailsDescription.textContent = spec.description;
-    this.detailsUnlocks.textContent = spec.unlocks;
-    this.detailsPrerequisites.textContent = `Prerequisites: ${prerequisites}`;
-    this.detailsStatus.textContent = statusText(view);
-    this.detailsStatus.dataset.status = view.status;
+    this.popoverTitle.textContent = spec.name;
+    this.popoverMeta.textContent = view.maxed ? `Level ${view.level}/${spec.maxLevel}` : `Level ${view.level}/${spec.maxLevel} | Cost ${view.cost}K`;
+    this.popoverDescription.textContent = spec.description;
+    this.popoverUnlocks.textContent = spec.unlocks;
     this.buyButton.disabled = !view.affordable;
-    this.buyButton.textContent = view.maxed ? 'Maxed' : `Buy for ${view.cost}K`;
+    this.buyButton.hidden = view.maxed;
+    this.buyButton.textContent = buyButtonText(view);
+    this.positionPopover(this.selectedNodeId);
+    this.popover.classList.add('meta-progress__popover--visible');
+    this.popover.setAttribute('aria-hidden', 'false');
+  }
+
+  private positionPopover(id: MetaUpgradeId): void {
+    const position = this.graphPoint(id);
+    const margin = 16;
+    const width = Math.max(this.popover.offsetWidth, 272);
+    const height = Math.max(this.popover.offsetHeight, 220);
+    const minLeft = this.graphElement.scrollLeft + margin;
+    const maxLeft = this.graphElement.scrollLeft + this.graphElement.clientWidth - width - margin;
+    const minTop = this.graphElement.scrollTop + margin;
+    const maxTop = this.graphElement.scrollTop + this.graphElement.clientHeight - height - margin;
+    const preferredLeft = position.x + 80;
+    const preferredTop = position.y - height / 2;
+    const left = clamp(preferredLeft > maxLeft ? position.x - width - 80 : preferredLeft, minLeft, Math.max(minLeft, maxLeft));
+    const top = clamp(preferredTop, minTop, Math.max(minTop, maxTop));
+
+    this.popover.style.left = `${left}px`;
+    this.popover.style.top = `${top}px`;
+  }
+
+  private renderPurchaseFeedback(previousState: GameState | undefined, state: GameState): void {
+    if (!previousState || !this.root.classList.contains('meta-progress--visible')) {
+      return;
+    }
+
+    const purchased = metaUpgradeSpecs.find((spec) => state.metaUpgrades[spec.id] > previousState.metaUpgrades[spec.id]);
+    if (!purchased) {
+      return;
+    }
+
+    this.knowledgeText.classList.remove('meta-progress__knowledge--pulse');
+    void this.knowledgeText.offsetWidth;
+    this.knowledgeText.classList.add('meta-progress__knowledge--pulse');
+    this.flashNode(purchased.id, 'meta-node--purchased');
+
+    metaUpgradeSpecs.forEach((spec) => {
+      const wasUnlocked = nodeState(previousState, spec.id).unlocked;
+      const isUnlocked = nodeState(state, spec.id).unlocked;
+      if (!wasUnlocked && isUnlocked) {
+        this.flashNode(spec.id, 'meta-node--newly-unlocked');
+      }
+    });
+  }
+
+  private flashNode(id: MetaUpgradeId, className: string): void {
+    const node = this.nodesLayer.querySelector<HTMLButtonElement>(`.meta-node[data-node-id="${id}"]`);
+    if (!node) {
+      return;
+    }
+
+    node.classList.remove(className);
+    void node.offsetWidth;
+    node.classList.add(className);
   }
 
   private requireElement<T extends HTMLElement | SVGSVGElement>(selector: string): T {
@@ -291,6 +404,14 @@ export class DomMetaProgressView {
       throw new Error(`Missing DOM meta element: ${selector}`);
     }
     return element;
+  }
+
+  private graphPoint(id: MetaUpgradeId): { x: number; y: number } {
+    const position = graphPoint(id);
+    return {
+      x: position.x + this.viewportPaddingX,
+      y: position.y + this.viewportPaddingY,
+    };
   }
 }
 
@@ -305,20 +426,20 @@ function nodeState(state: GameState, id: MetaUpgradeId): NodeState {
   return { affordable, cost, level, maxed, status, unlocked };
 }
 
-function statusText(view: NodeState): string {
+function buyButtonText(view: NodeState): string {
   if (view.maxed) {
-    return 'Status: MAX';
+    return 'Maxed';
   }
 
   if (!view.unlocked) {
-    return 'Status: Locked';
+    return 'Locked';
   }
 
-  if (view.affordable) {
-    return `Status: Buy now for ${view.cost}K`;
+  if (!view.affordable) {
+    return `Need ${view.cost}K`;
   }
 
-  return `Status: Need ${view.cost}K`;
+  return `Buy ${view.cost}K`;
 }
 
 function graphPoint(id: MetaUpgradeId): { x: number; y: number } {
@@ -333,4 +454,8 @@ function escapeHtml(value: string): string {
   const element = document.createElement('div');
   element.textContent = value;
   return element.innerHTML;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
