@@ -90,6 +90,8 @@ export class GameScene extends Phaser.Scene {
     const launchProfile = {
       ...result.rolledStats,
       reliability: this.state.rocketStats.reliability / 99,
+      outcome: result.outcome,
+      failedStat: result.failedStat,
     };
     const launchRollDuration = this.rocket.ignitionDuration(launchProfile) + this.rocket.flightDuration(result.altitudeMeters, launchProfile);
 

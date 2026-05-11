@@ -57,6 +57,16 @@ describe('rocket simulation', () => {
     expect(rocketScore(state.rocketStats)).toBeLessThan(orbitScoreThreshold);
   });
 
+  it('scores performance stats as an even sum', () => {
+    expect(rocketScore({
+      thrust: 1,
+      fuel: 2,
+      aerodynamics: 3,
+      lightness: 4,
+      guidance: 5,
+    })).toBe(15);
+  });
+
   it('does not roll zero launch stats upward or leave the pad', () => {
     const next = simulateLaunch(createInitialState(1), new FixedRng([0.99, 0.99, 0.99, 0.99, 0.99, 0]));
 

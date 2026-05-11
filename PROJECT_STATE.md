@@ -30,6 +30,8 @@ These live in `src/sim/rocketStats.ts` and now start at `0`. Lesson effects rebu
 
 A perfect launch roll with all performance stats at `99` reaches the altitude cap of `500 km`.
 
+Launch score is now a simple even sum of the five performance stats, with no hidden per-stat weight multipliers.
+
 Launch failure checks now use the built rocket stats plus reliability instead of the already-rolled performance stats, so a weak performance roll does not also double-count as a higher explosion chance. Reliability directly reduces catastrophic failure odds and still tightens the launch variance band. If multiple systems fail in the same launch, the failed phase is selected by weighted chance instead of fixed stat order. Any effective failure blocks orbit, even when Safety Review Board vetoes the explosion.
 
 Lesson cards now cover every simplified rocket stat directly:
@@ -64,7 +66,7 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 ## UI State
 
 - Main HUD is now a DOM overlay above Phaser, with responsive layout for narrow and short windows.
-- Rocket rolls from hangar to pad, launches upward, and the camera follows.
+- Rocket rolls from hangar to pad, launches upward, and the camera follows. Launch animation now uses rolled stats for clearer physical presentation: thrust affects acceleration/flame size, fuel affects burn duration/cutoff, aerodynamics/guidance/reliability affect wobble and drift, and failed systems add phase-specific instability.
 - Launch summary and lesson cards are DOM overlays with CSS-driven responsive grid/stack behavior. Phaser still handles world, rocket, camera, and effects.
 - Lesson cards show exact current effect values from active meta upgrades instead of vague scaling labels.
 - Meta upgrades are displayed as a DOM/SVG bankruptcy review overlay with an authored compass graph: root centered, economy west, flight east, and review/knowledge south.
