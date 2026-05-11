@@ -15,6 +15,13 @@ interface LaunchVisualProfile {
 const ROCKET_ORIGIN_Y = 0.66;
 const MAX_NORMAL_TILT = 16;
 
+interface FlightCurve {
+  burnEnd: number;
+  acceleration: number;
+  gravity: number;
+  finalHeight: number;
+}
+
 export class RocketView {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly outerFlame: Phaser.GameObjects.Triangle;
@@ -167,13 +174,13 @@ export class RocketView {
     const driftX = horizontalBias * driftMagnitude;
     const wobble = (1 - stability) * 28;
     const buffeting = (1 - aerodynamics) * 22 + (1 - profile.reliability) * 14;
-    const poweredEnd = Phaser.Math.Clamp(0.28 + fuel * 0.48 + thrust * 0.12, 0.26, 0.86);
+    const flightCurve = createFlightCurve(thrust, fuel);
     const duration = this.flightDuration(altitudeMeters, profile);
 
     this.startBurn(profile, false);
 
     await tweenProgress(this.scene, duration, (progress) => {
-      const eased = ascentProgress(progress, poweredEnd);
+      const eased = ascentProgress(progress, flightCurve);
       const launchWeight = Phaser.Math.Clamp(eased / 0.18, 0, 1);
       const aeroFlutter = Math.sin(progress * Math.PI * (7 + (1 - aerodynamics) * 8)) * buffeting * Math.sin(progress * Math.PI);
       const guidanceWander = Math.sin(progress * Math.PI * 2.3) * wobble * (1 - eased * 0.48);
@@ -189,7 +196,7 @@ export class RocketView {
         baseX,
         baseY,
       );
-      this.updateFlightFlame(profile, progress, poweredEnd);
+      this.updateFlightFlame(profile, progress, flightCurve.burnEnd);
       this.syncFlamePosition();
     });
 
@@ -198,7 +205,9 @@ export class RocketView {
   }
 
   ignitionDuration(profile: LaunchVisualProfile): number {
-    return Phaser.Math.Clamp(260 + profile.fuel * 3.2, 300, 620);
+    const thrust = statRatio(profile.thrust);
+    const fuel = statRatio(profile.fuel);
+    return Phaser.Math.Clamp(320 + (1 - thrust) * 260 + (1 - fuel) * 120, 320, 740);
   }
 
   flightDuration(altitudeMeters: number, profile: LaunchVisualProfile): number {
@@ -208,9 +217,9 @@ export class RocketView {
     const aerodynamics = statRatio(profile.aerodynamics);
     const lightness = statRatio(profile.lightness);
     return Phaser.Math.Clamp(
-      980 + visualRise * (2.32 - thrust * 0.36 - lightness * 0.24 - aerodynamics * 0.18) + fuel * 340,
-      1250,
-      4200,
+      980 + visualRise * (2.55 - thrust * 0.78 - lightness * 0.24 - aerodynamics * 0.18) + fuel * 340,
+      1150,
+      4600,
     );
   }
 
@@ -234,7 +243,7 @@ export class RocketView {
 
   private startBurn(profile: LaunchVisualProfile, ignitionPhase: boolean): void {
     this.stopBurn();
-    if (profile.thrust <= 0 || profile.fuel <= 0) {
+    if (profile.thrust <= 0) {
       return;
     }
 
@@ -252,7 +261,7 @@ export class RocketView {
       scaleY: `*=${ignitionPhase ? 1.08 : 1.16}`,
       yoyo: true,
       repeat: -1,
-      duration: Phaser.Math.Clamp(70 + (99 - profile.fuel) * 2, 80, 220),
+      duration: Phaser.Math.Clamp(70 + (99 - profile.fuel) * 2.3, 80, 260),
       onUpdate: () => this.syncFlamePosition(),
     });
   }
@@ -274,7 +283,8 @@ export class RocketView {
     const thrust = statRatio(profile.thrust);
     const fuel = statRatio(profile.fuel);
     const reliability = profile.reliability;
-    const sputter = 0.72 + reliability * 0.28 + Math.sin(progress * Math.PI * (12 + fuel * 18)) * (0.06 + (1 - reliability) * 0.18);
+    const lowFuelSputter = Math.max(0, 0.2 - fuel) * 1.8;
+    const sputter = 0.68 + fuel * 0.12 + reliability * 0.2 + Math.sin(progress * Math.PI * (12 + fuel * 18)) * (0.06 + (1 - reliability) * 0.18 + lowFuelSputter);
     const throttle = Phaser.Math.Clamp(0.72 + thrust * 0.55, 0.6, 1.35) * Phaser.Math.Clamp(sputter, 0.35, 1.15);
     const fuelStretch = Phaser.Math.Clamp(0.75 + fuel * 0.7, 0.55, 1.45);
 
@@ -349,10 +359,10 @@ function statRatio(value: number): number {
   return Phaser.Math.Clamp(value / 99, 0, 1);
 }
 
-function ascentProgress(progress: number, poweredEnd: number): number {
+function ascentProgress(progress: number, poweredEnd: number, thrust: number): number {
   if (progress <= poweredEnd) {
     const poweredProgress = progress / poweredEnd;
-    return 0.66 * Math.pow(poweredProgress, 2.08);
+    return 0.66 * Math.pow(poweredProgress, Phaser.Math.Linear(2.45, 1.42, thrust));
   }
 
   const coastProgress = (progress - poweredEnd) / Math.max(0.01, 1 - poweredEnd);

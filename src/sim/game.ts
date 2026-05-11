@@ -1,7 +1,7 @@
 import { Mulberry32, type Rng } from './rng';
 import { availableLessons, defaultLessons, rebuildRocketStats } from './lessons';
 import { buyMetaUpgrade as buyMetaUpgradeCore, defaultMetaUpgrades, metaUpgradeCost } from './metaUpgrades';
-import { launchVariance, orbitScoreThreshold, perfectRocketScore, performanceStatIds, rocketScore, statLabel, type PerformanceStatId } from './rocketStats';
+import { fuelSustainFactor, launchVariance, orbitScoreThreshold, perfectRocketScore, performanceStatIds, rocketScore, statLabel, thrustLiftFactor, type PerformanceStatId } from './rocketStats';
 import type {
   FailurePhase,
   GameState,
@@ -167,7 +167,8 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
   const failure = rollFailure(state.rocketStats, rng);
   const reliability = state.rocketStats.reliability / 99;
   const score = rocketScore(rolledStats);
-  const nominalAltitudeMeters = Math.floor(maxLaunchAltitudeMeters * clamp(score / perfectRocketScore, 0, 1));
+  const altitudeScore = score * thrustLiftFactor(rolledStats.thrust) * fuelSustainFactor(rolledStats.fuel);
+  const nominalAltitudeMeters = Math.floor(maxLaunchAltitudeMeters * clamp(altitudeScore / perfectRocketScore, 0, 1));
   const altitudeMeters = failure
     ? Math.floor(nominalAltitudeMeters * failure.altitudeFactor)
     : nominalAltitudeMeters;
@@ -185,7 +186,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
 
   if (effectiveFailure?.explodes) {
     outcome = 'exploded';
-  } else if (!effectiveFailure && score >= orbitScoreThreshold) {
+  } else if (!effectiveFailure && altitudeScore >= orbitScoreThreshold) {
     outcome = 'orbit';
   }
 

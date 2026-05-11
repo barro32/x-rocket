@@ -34,6 +34,8 @@ Launch score is now a simple even sum of the five performance stats, with no hid
 
 Launch failure checks now use the built rocket stats plus reliability instead of the already-rolled performance stats, so a weak performance roll does not also double-count as a higher explosion chance. Reliability directly reduces catastrophic failure odds and still tightens the launch variance band. If multiple systems fail in the same launch, the failed phase is selected by weighted chance instead of fixed stat order. Any effective failure blocks orbit, even when Safety Review Board vetoes the explosion.
 
+Thrust and fuel now gate how much raw performance score turns into altitude and orbit eligibility. A rocket with strong fuel, aero, lightness, and guidance but no thrust cannot leave the pad. A high-thrust rocket with no fuel can make a short ballistic hop, but it cannot sustain enough altitude score for orbit. A rocket can have a high raw score and still fail orbit if its thrust lift or fuel sustain factor is too low.
+
 Lesson cards now cover every simplified rocket stat directly:
 
 - `Tune the Engine Mix`: thrust
@@ -67,12 +69,12 @@ Meta upgrades no longer grant broad permanent flight stat boosts or simply add l
 
 - Main HUD is now a DOM overlay above Phaser, with responsive layout for narrow and short windows.
 - DOM overlay styles are split by owner: global base styles and design tokens live in `src/styles/base.css`, while `DomUiView`, `DomMetaProgressView`, and `DevLaunchPanelView` import their own adjacent CSS files. Shared tokens now cover palette, UI states, graph colors, lesson card accents/art backgrounds, radii, shadows, fonts, and layer order.
-- Rocket rolls from hangar to pad, launches upward, and the camera follows. Launch animation now uses rolled stats for clearer physical presentation: thrust affects acceleration/flame size, fuel affects burn duration/cutoff, aerodynamics/guidance/reliability affect wobble and drift, and failed systems add phase-specific instability. Takeoff now has a slower ignition/ascent ramp, body-centered shake, and flame alignment that follows rocket tilt.
+- Rocket rolls from hangar to pad, launches upward, and the camera follows. Launch animation now uses rolled stats for clearer physical presentation: thrust affects acceleration/flame size, fuel affects burn duration/cutoff/sputter, aerodynamics/guidance/reliability affect wobble and drift, and failed systems add phase-specific instability. Takeoff now has a slower ignition/ascent ramp, body-centered shake, flame alignment that follows rocket tilt, and a thrust-sensitive ascent curve where weak thrust lingers on ignition/climbs sluggishly while strong thrust lifts faster.
 - Launch summary and lesson cards are DOM overlays with CSS-driven responsive grid/stack behavior. Phaser still handles world, rocket, camera, and effects.
 - Lesson cards show exact current effect values from active meta upgrades instead of vague scaling labels.
 - Meta upgrades are displayed as a DOM/SVG bankruptcy review overlay with an authored compass graph: root centered, economy west, flight east, and review/knowledge south. Node details and purchase actions now open in a concise node-local popover, with a mobile bottom-sheet layout and purchase/unlock feedback animations.
 - Dev stats toggle with `D`.
-- `D` also opens a launch tuning panel with stat sliders. When override is enabled, launches use the slider stats for testing while saved rocket stats remain unchanged.
+- `D` also opens a launch tuning panel with stat sliders. When override is enabled, launches use the slider stats for testing while saved rocket stats remain unchanged. Dev stats show raw score, thrust lift factor, fuel sustain factor, and combined altitude score.
 - Global menu is a DOM modal and includes reset game.
 
 ## Known Near-Term Work

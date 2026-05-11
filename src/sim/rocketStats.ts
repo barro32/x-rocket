@@ -40,6 +40,18 @@ export function rocketScore(stats: Pick<RocketStats, 'thrust' | 'fuel' | 'aerody
   return stats.thrust + stats.fuel + stats.aerodynamics + stats.lightness + stats.guidance;
 }
 
+export function thrustLiftFactor(thrust: number): number {
+  if (thrust <= 0) {
+    return 0;
+  }
+
+  return Math.pow(Math.min(1, Math.max(0, thrust / 99)), 0.72);
+}
+
+export function fuelSustainFactor(fuel: number): number {
+  return 0.12 + 0.88 * Math.pow(Math.min(1, Math.max(0, fuel / 99)), 0.68);
+}
+
 export const perfectRocketScore = rocketScore({
   thrust: 99,
   fuel: 99,

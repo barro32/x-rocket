@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { launchVariance, orbitScoreThreshold, rocketScore } from '../../sim/rocketStats';
+import { fuelSustainFactor, launchVariance, orbitScoreThreshold, rocketScore, thrustLiftFactor } from '../../sim/rocketStats';
 import type { GameState } from '../../sim/types';
 
 export class DevStatsView {
@@ -32,6 +32,9 @@ export class DevStatsView {
     }
 
     const stats = state.rocketStats;
+    const score = rocketScore(stats);
+    const liftFactor = thrustLiftFactor(stats.thrust);
+    const sustainFactor = fuelSustainFactor(stats.fuel);
     this.text.setText(
       [
         'DEV ROCKET STATS',
@@ -42,7 +45,10 @@ export class DevStatsView {
         `guidance: ${fmt(stats.guidance)}`,
         `reliability: ${fmt(stats.reliability)}`,
         `variance: +/-${launchVariance(stats)}`,
-        `score: ${fmt(rocketScore(stats))}`,
+        `score: ${fmt(score)}`,
+        `thrust lift: ${fmt(liftFactor)}`,
+        `fuel sustain: ${fmt(sustainFactor)}`,
+        `alt score: ${fmt(score * liftFactor * sustainFactor)}`,
         `orbit: ${orbitScoreThreshold}`,
       ].join('\n'),
     );

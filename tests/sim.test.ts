@@ -81,6 +81,73 @@ describe('rocket simulation', () => {
     expect(next.lastLaunch?.altitudeMeters).toBe(0);
   });
 
+  it('requires thrust to turn other rocket stats into altitude', () => {
+    const state = {
+      ...createInitialState(1),
+      money: 1_000,
+      rocketStats: {
+        thrust: 0,
+        fuel: 99,
+        aerodynamics: 99,
+        lightness: 99,
+        guidance: 99,
+        reliability: 99,
+      },
+    };
+    const next = simulateLaunch(state, new FixedRng([0.99, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
+
+    expect(next.lastLaunch?.rolledStats.thrust).toBe(0);
+    expect(next.lastLaunch?.altitudeMeters).toBe(0);
+  });
+
+  it('requires enough altitude score to reach orbit', () => {
+    const state = {
+      ...createInitialState(1),
+      money: 1_000,
+      rocketStats: {
+        thrust: 1,
+        fuel: 99,
+        aerodynamics: 99,
+        lightness: 99,
+        guidance: 99,
+        reliability: 99,
+      },
+    };
+    const next = simulateLaunch(state, new FixedRng([0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99]));
+
+    expect(next.lastLaunch?.score).toBeGreaterThan(orbitScoreThreshold);
+    expect(next.lastLaunch?.outcome).toBe('failed');
+  });
+
+  it('uses fuel to sustain altitude after thrust gets the rocket moving', () => {
+    const dryState = {
+      ...createInitialState(1),
+      money: 1_000,
+      rocketStats: {
+        thrust: 99,
+        fuel: 0,
+        aerodynamics: 99,
+        lightness: 99,
+        guidance: 99,
+        reliability: 99,
+      },
+    };
+    const fueledState = {
+      ...dryState,
+      rocketStats: {
+        ...dryState.rocketStats,
+        fuel: 99,
+      },
+    };
+    const cleanFlightRng = [0.5, 0.5, 0.5, 0.5, 0.5, 0.99, 0.99, 0.99, 0.99, 0.99];
+    const dryLaunch = simulateLaunch(dryState, new FixedRng(cleanFlightRng));
+    const fueledLaunch = simulateLaunch(fueledState, new FixedRng(cleanFlightRng));
+
+    expect(dryLaunch.lastLaunch?.altitudeMeters).toBeGreaterThan(0);
+    expect(dryLaunch.lastLaunch?.outcome).toBe('failed');
+    expect(fueledLaunch.lastLaunch?.altitudeMeters).toBeGreaterThan(dryLaunch.lastLaunch?.altitudeMeters ?? 0);
+  });
+
   it('allows nonzero launch stats to overperform without letting zero stats do so', () => {
     const state = {
       ...createInitialState(1),
