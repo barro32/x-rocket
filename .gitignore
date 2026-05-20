@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 
 # Build output
@@ -35,3 +34,6 @@ yarn-error.log*
 *.tmp
 .cache/
 .vercel
+
+# Local debug snapshots
+.debug/

@@ -1,0 +1,87 @@
+export type DiceCategory = 'thrusters' | 'fuel' | 'aerodynamics' | 'guidance' | 'weight';
+
+export type CardRarity = 'common' | 'uncommon' | 'rare';
+
+export type MetaNodeId = string;
+
+export interface CategoryDie {
+  id: string;
+  category: DiceCategory;
+  faces: number[];
+}
+
+export interface DieRoll {
+  dieId: string;
+  category: DiceCategory;
+  value: number;
+  faces: number[];
+  rerolledFrom?: number;
+}
+
+export interface LaunchRoll {
+  rolls: DieRoll[];
+  score: number;
+  exploded: boolean;
+}
+
+export type CardEffect =
+  | { type: 'addFaceValue'; category: DiceCategory; faceIndex: number; amount: number }
+  | { type: 'addAllFaces'; category: DiceCategory; amount: number }
+  | { type: 'multiplyDice'; category: DiceCategory; multiplier: number }
+  | { type: 'autoRerollLowest'; amount: number }
+  | { type: 'doubleHighestRoll' }
+  | { type: 'categoryDelta'; category: DiceCategory; amount: number; penaltyCategory?: DiceCategory; penaltyAmount?: number }
+  | { type: 'topBottomDelta'; topAmount: number; bottomAmount: number };
+
+export interface CardSpec {
+  id: string;
+  name: string;
+  rarity: CardRarity;
+  description: string;
+  effect: CardEffect;
+}
+
+export interface LaunchResult {
+  roll: LaunchRoll;
+  heightMeters: number;
+  moneyDelta: number;
+  reachedRunMilestones: number[];
+  reachedAllTimeMilestones: number[];
+  message: string;
+}
+
+export type MetaNodeEffect =
+  | { type: 'startingMoney' }
+  | { type: 'addFaceValue'; category: DiceCategory; faceIndex: number; amount: number }
+  | { type: 'addWeakestFace'; amount: number }
+  | { type: 'unlockCard'; cardId: string };
+
+export interface MetaNodeSpec {
+  id: MetaNodeId;
+  label: string;
+  cost: number;
+  x: number;
+  y: number;
+  z: number;
+  effect: MetaNodeEffect;
+}
+
+export interface GameState {
+  version: 3;
+  money: number;
+  metaCurrency: number;
+  boughtMetaNodes: MetaNodeId[];
+  dice: Record<DiceCategory, CategoryDie[]>;
+  runCards: CardSpec[];
+  autoRerollLowest: number;
+  launchCount: number;
+  bankruptcies: number;
+  bankruptcyRewardClaimed: boolean;
+  highestAltitudeMeters: number;
+  allTimeMilestoneClaims: number[];
+  runMilestoneClaims: number[];
+  pendingCardAwards: number;
+  pendingCardChoices: CardSpec[];
+  lastLaunch?: LaunchResult;
+  seed: number;
+}
