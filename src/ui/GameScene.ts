@@ -4,7 +4,7 @@ import { claimBankruptcyReward, chooseCard, createInitialState, isBankrupt, laun
 import { applyCard, startingDice } from '../sim/dice';
 import { unlockedCardPoolFor } from '../sim/cards';
 import { clearSave, loadGame, saveGame } from '../sim/save';
-import type { CardSpec, DiceCategory, GameState, MetaNodeId } from '../sim/types';
+import type { CardSpec, DiceCategory, DieRoll, GameState, MetaNodeId } from '../sim/types';
 import { categoryColors, categoryLabels, diceCategories } from '../sim/categories';
 import { renderDiceGrid } from './diceGridView';
 import { escapeHtml, renderMetaGrid } from './metaGridView';
@@ -218,16 +218,19 @@ export class GameScene extends Phaser.Scene {
         <div class="roll-showcase">
           ${result.roll.rolls.map((roll, index) => {
             const revealed = index < visibleCount;
-            const valueText = roll.rerolledFrom === undefined ? `${roll.value}` : `${roll.rerolledFrom}->${roll.value}`;
             return `
-              <div class="roll-card stat-themed ${revealed ? 'revealed' : 'pending'} ${revealed && roll.value === 0 ? 'zero' : ''}" style="--stat-color: ${categoryColors[roll.category]}">
-                <span>${categoryLabels[roll.category]}</span>
-                <strong>${revealed ? valueText : '?'}</strong>
+              <div
+                class="roll-card stat-themed ${revealed ? 'revealed' : 'pending'} ${revealed && roll.value === 0 ? 'zero' : ''}"
+                style="--stat-color: ${categoryColors[roll.category]}"
+                title="${categoryLabels[roll.category]}"
+                aria-label="${categoryLabels[roll.category]} roll"
+              >
+                <strong>${revealed ? roll.value : '?'}</strong>
+                ${revealed ? renderRollBreakdown(roll) : '<div class="roll-breakdown"><span></span></div>'}
               </div>
             `;
           }).join('')}
         </div>
-        ${complete ? `<p>${escapeHtml(result.message)}</p>` : ''}
         <div class="milestones">
           ${milestones.map((milestone) => `<span class="${this.state.runMilestoneClaims.includes(milestone) ? 'hit' : ''}">${milestone}m</span>`).join('')}
         </div>
@@ -340,6 +343,21 @@ export class GameScene extends Phaser.Scene {
     `;
   }
 
+}
+
+function renderRollBreakdown(roll: DieRoll): string {
+  const steps = [
+    `roll ${roll.initialValue}`,
+    ...roll.modifiers.map((modifier) => modifier.label === 'reroll'
+      ? `reroll ${modifier.after}`
+      : modifier.label),
+  ];
+
+  return `
+    <div class="roll-breakdown">
+      ${steps.map((step) => `<span>${escapeHtml(step)}</span>`).join('')}
+    </div>
+  `;
 }
 
 function delay(ms: number): Promise<void> {

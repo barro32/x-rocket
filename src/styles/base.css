@@ -253,30 +253,44 @@ h2 {
   align-items: center;
   background: color-mix(in srgb, var(--stat-color) 13%, #17263d);
   border: 1px solid color-mix(in srgb, var(--stat-color) 70%, #647892);
-  border-radius: 8px;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 76px;
-  padding: 8px 6px;
+  min-height: 0;
+  padding: 8px;
+  aspect-ratio: 1;
   transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.roll-card span {
-  color: color-mix(in srgb, var(--stat-color) 60%, #ffffff);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.1;
-  text-align: center;
-  text-transform: uppercase;
 }
 
 .roll-card strong {
   color: #ffffff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 30px;
+  font-size: 34px;
   line-height: 1;
-  margin-top: 8px;
+}
+
+.roll-breakdown {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 7px;
+  min-height: 32px;
+}
+
+.roll-breakdown span {
+  background: rgba(5, 9, 16, 0.38);
+  border: 1px solid color-mix(in srgb, var(--stat-color) 42%, transparent);
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--stat-color) 58%, #ffffff);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 3px 4px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .roll-card.pending {

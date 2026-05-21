@@ -13,9 +13,17 @@ export interface CategoryDie {
 export interface DieRoll {
   dieId: string;
   category: DiceCategory;
+  initialValue: number;
   value: number;
   faces: number[];
   rerolledFrom?: number;
+  modifiers: RollModifier[];
+}
+
+export interface RollModifier {
+  label: string;
+  before: number;
+  after: number;
 }
 
 export interface LaunchRoll {

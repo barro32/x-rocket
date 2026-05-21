@@ -1,6 +1,6 @@
 import { createInitialState } from './game';
 import { diceCategories } from './categories';
-import type { CardSpec, DiceCategory, GameState } from './types';
+import type { CardSpec, DiceCategory, GameState, LaunchResult } from './types';
 
 const saveKey = 'x-rocket-save-v3';
 
@@ -65,6 +65,7 @@ function normalizeSave(parsed: GameState): GameState {
     runMilestoneClaims: parsed.runMilestoneClaims ?? [],
     pendingCardAwards: parsed.pendingCardAwards ?? 0,
     pendingCardChoices: normalizeCards(parsed.pendingCardChoices),
+    lastLaunch: normalizeLaunchResult(parsed.lastLaunch),
   };
 }
 
@@ -95,4 +96,24 @@ function normalizeCards(cards: SavedCardSpec[] | undefined): CardSpec[] {
 
     return card as CardSpec;
   });
+}
+
+function normalizeLaunchResult(result: LaunchResult | undefined): LaunchResult | undefined {
+  if (!result) {
+    return undefined;
+  }
+
+  return {
+    ...result,
+    roll: {
+      ...result.roll,
+      rolls: result.roll.rolls.map((roll) => ({
+        ...roll,
+        initialValue: roll.initialValue ?? roll.rerolledFrom ?? roll.value,
+        modifiers: roll.modifiers ?? (roll.rerolledFrom === undefined
+          ? []
+          : [{ label: 'reroll', before: roll.rerolledFrom, after: roll.value }]),
+      })),
+    },
+  };
 }
