@@ -3,12 +3,13 @@ import { pickOne, type Rng } from './rng';
 import type { CardSpec, CategoryDie, DiceCategory, DieRoll, LaunchRoll } from './types';
 
 export function rollDice(
-  dice: Record<DiceCategory, CategoryDie[]>,
+  dice: Record<DiceCategory, CategoryDie>,
   rng: Rng,
   autoRerollLowest: number,
   runCards: CardSpec[],
 ): LaunchRoll {
-  const rolls: DieRoll[] = diceCategories.flatMap((category) => dice[category].map((die) => {
+  const rolls: DieRoll[] = diceCategories.map((category) => {
+    const die = dice[category];
     const value = pickOne(die.faces, rng);
     return {
       dieId: die.id,
@@ -16,7 +17,7 @@ export function rollDice(
       value,
       faces: [...die.faces],
     };
-  }));
+  });
 
   for (let i = 0; i < autoRerollLowest; i += 1) {
     const lowestIndex = lowestRollIndex(rolls);
@@ -38,7 +39,7 @@ export function rollDice(
 function applyRollCardEffects(rolls: DieRoll[], runCards: CardSpec[]): void {
   for (const card of runCards) {
     switch (card.effect.type) {
-      case 'multiplyDice':
+      case 'multiplyStat':
         multiplyCategory(rolls, card.effect.category, card.effect.multiplier);
         break;
       case 'doubleHighestRoll':
@@ -55,6 +56,8 @@ function applyRollCardEffects(rolls: DieRoll[], runCards: CardSpec[]): void {
         adjustRoll(rolls, lowestRollIndex(rolls), card.effect.bottomAmount);
         break;
       case 'addFaceValue':
+      case 'addRandomFaceValue':
+      case 'addFaceValueToCategories':
       case 'addAllFaces':
       case 'autoRerollLowest':
         break;

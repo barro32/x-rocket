@@ -1,10 +1,11 @@
-import { canBuyMetaNode, isMetaNodeUnlocked, metaNodes } from '../sim/meta';
-import type { GameState } from '../sim/types';
+import { canBuyMetaNode, isMetaNodeUnlocked, positionedMetaNodes } from '../sim/meta';
+import { categoryColors, diceCategories } from '../sim/categories';
+import type { DiceCategory, GameState, MetaNodeEffect } from '../sim/types';
 
 export function renderMetaGrid(state: GameState): string {
   const size = 36;
   const points = hexPoints(size);
-  const positionedNodes = metaNodes.map((node) => {
+  const positionedNodes = positionedMetaNodes.map((node) => {
     const x = Math.sqrt(3) * size * (node.x + node.z / 2);
     const y = 1.5 * size * node.z;
     return { node, x, y };
@@ -23,9 +24,12 @@ export function renderMetaGrid(state: GameState): string {
         const bought = state.boughtMetaNodes.includes(node.id);
         const unlocked = isMetaNodeUnlocked(state, node.id);
         const buyable = canBuyMetaNode(state, node.id);
+        const temporary = node.effect.type === 'autoRerollLowest';
+        const category = categoryForMetaEffect(node.effect);
         return `
           <g
-            class="hex-node ${bought ? 'bought' : ''} ${unlocked ? '' : 'locked'} ${buyable ? 'buyable' : ''}"
+            class="hex-node ${category ? 'stat-themed' : ''} ${bought ? 'bought' : ''} ${unlocked ? '' : 'locked'} ${buyable ? 'buyable' : ''} ${temporary ? 'temporary' : ''}"
+            ${category ? `style="--stat-color: ${categoryColors[category]}"` : ''}
             data-meta="${node.id}"
             transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"
             tabindex="${buyable ? '0' : '-1'}"
@@ -33,13 +37,30 @@ export function renderMetaGrid(state: GameState): string {
             aria-disabled="${buyable ? 'false' : 'true'}"
           >
             <polygon points="${points}" />
-            <text class="hex-label" y="-4">${escapeHtml(node.label)}</text>
-            <text class="hex-cost" y="15">${bought ? '1' : node.cost}</text>
+            <text class="hex-label">${escapeHtml(node.label)}</text>
           </g>
         `;
       }).join('')}
     </svg>
   `;
+}
+
+function categoryForMetaEffect(effect: MetaNodeEffect): DiceCategory | undefined {
+  switch (effect.type) {
+    case 'addFaceValue':
+    case 'upgradeRandomFaceCard':
+      return effect.category;
+    case 'unlockCard':
+      return categoryFromCardId(effect.cardId);
+    case 'startingMoney':
+    case 'addWeakestFace':
+    case 'autoRerollLowest':
+      return undefined;
+  }
+}
+
+function categoryFromCardId(cardId: string): DiceCategory | undefined {
+  return diceCategories.find((category) => cardId.endsWith(`-${category}`));
 }
 
 function hexPoints(size: number): string {
@@ -49,7 +70,7 @@ function hexPoints(size: number): string {
   }).join(' ');
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

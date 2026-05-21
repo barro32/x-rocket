@@ -1,9 +1,15 @@
 import { createInitialState } from './game';
 import { diceCategories } from './categories';
-import type { GameState } from './types';
+import type { CardSpec, DiceCategory, GameState } from './types';
 
 const saveKey = 'x-rocket-save-v3';
-export const saveFileName = `${saveKey}.json`;
+
+type SavedCardSpec = Omit<CardSpec, 'effect'> & {
+  effect:
+    | CardSpec['effect']
+    | { type: 'multiplyDice'; category: DiceCategory; multiplier: number }
+    | { type: 'addRandomFaceValue'; category: DiceCategory; faceIndex: number; amount: number };
+};
 
 export function loadGame(storage: Storage = window.localStorage): GameState {
   const raw = storage.getItem(saveKey);
@@ -27,10 +33,6 @@ export function parseSave(raw: string): GameState {
   return normalizeSave(parsed);
 }
 
-export function serializeSave(state: GameState): string {
-  return JSON.stringify(state, null, 2);
-}
-
 export function saveGame(state: GameState, storage: Storage = window.localStorage): void {
   storage.setItem(saveKey, JSON.stringify(state));
 }
@@ -43,7 +45,10 @@ function normalizeSave(parsed: GameState): GameState {
   const fallback = createInitialState(parsed.seed);
   const dice = { ...fallback.dice, ...parsed.dice };
   for (const category of diceCategories) {
-    if (!Array.isArray(dice[category]) || dice[category].length === 0) {
+    const savedDie = dice[category];
+    if (Array.isArray(savedDie)) {
+      dice[category] = savedDie[0] ?? fallback.dice[category];
+    } else if (!savedDie?.faces) {
       dice[category] = fallback.dice[category];
     }
   }
@@ -53,11 +58,41 @@ function normalizeSave(parsed: GameState): GameState {
     ...parsed,
     dice,
     boughtMetaNodes: parsed.boughtMetaNodes ?? [],
-    runCards: parsed.runCards ?? [],
+    runCards: normalizeCards(parsed.runCards),
     autoRerollLowest: parsed.autoRerollLowest ?? 0,
+    temporaryAutoRerollLowest: parsed.temporaryAutoRerollLowest ?? fallback.temporaryAutoRerollLowest,
     allTimeMilestoneClaims: parsed.allTimeMilestoneClaims ?? [],
     runMilestoneClaims: parsed.runMilestoneClaims ?? [],
     pendingCardAwards: parsed.pendingCardAwards ?? 0,
-    pendingCardChoices: parsed.pendingCardChoices ?? [],
+    pendingCardChoices: normalizeCards(parsed.pendingCardChoices),
   };
+}
+
+function normalizeCards(cards: SavedCardSpec[] | undefined): CardSpec[] {
+  return (cards ?? []).map((card) => {
+    if (card.effect.type === 'multiplyDice') {
+      return {
+        ...card,
+        effect: {
+          type: 'multiplyStat',
+          category: card.effect.category,
+          multiplier: card.effect.multiplier,
+        },
+      };
+    }
+
+    if (card.effect.type === 'addRandomFaceValue' && 'faceIndex' in card.effect) {
+      return {
+        ...card,
+        effect: {
+          type: 'addRandomFaceValue',
+          category: card.effect.category,
+          faceIndexes: [card.effect.faceIndex],
+          amount: card.effect.amount,
+        },
+      };
+    }
+
+    return card as CardSpec;
+  });
 }

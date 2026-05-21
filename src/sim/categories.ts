@@ -10,6 +10,14 @@ export const categoryLabels: Record<DiceCategory, string> = {
   weight: 'Weight',
 };
 
+export const categoryColors: Record<DiceCategory, string> = {
+  thrusters: '#ff5a5f',
+  fuel: '#58d68d',
+  aerodynamics: '#4ea1ff',
+  guidance: '#f7c948',
+  weight: '#c084fc',
+};
+
 export function categoryLabel(category: DiceCategory): string {
   return categoryLabels[category];
 }

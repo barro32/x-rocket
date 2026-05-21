@@ -1,5 +1,6 @@
 import { draftCards } from './cards';
 import { applyCard, startingDice } from './dice';
+import { metaNodeById } from './meta';
 import { rollDice } from './roll';
 import { Mulberry32, type Rng } from './rng';
 import type { GameState, LaunchResult, MetaNodeId } from './types';
@@ -20,6 +21,7 @@ export function createInitialState(seed = Date.now()): GameState {
     dice: startingDice(boughtMetaNodes),
     runCards: [],
     autoRerollLowest: 0,
+    temporaryAutoRerollLowest: startingTemporaryAutoRerollLowest(boughtMetaNodes),
     launchCount: 0,
     bankruptcies: 0,
     bankruptcyRewardClaimed: false,
@@ -40,6 +42,7 @@ export function restartRun(state: GameState): GameState {
     dice: startingDice(claimed.boughtMetaNodes),
     runCards: [],
     autoRerollLowest: 0,
+    temporaryAutoRerollLowest: startingTemporaryAutoRerollLowest(claimed.boughtMetaNodes),
     launchCount: 0,
     bankruptcies: claimed.bankruptcies + 1,
     bankruptcyRewardClaimed: false,
@@ -72,7 +75,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     return state;
   }
 
-  const roll = rollDice(state.dice, rng, state.autoRerollLowest, state.runCards);
+  const roll = rollDice(state.dice, rng, state.autoRerollLowest + state.temporaryAutoRerollLowest, state.runCards);
   const heightMeters = roll.exploded ? 0 : roll.score;
   const reachedRunMilestones = milestones.filter((milestone) => heightMeters >= milestone && !state.runMilestoneClaims.includes(milestone));
   const reachedAllTimeMilestones: number[] = [];
@@ -96,6 +99,7 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     runMilestoneClaims: uniqueNumbers([...state.runMilestoneClaims, ...reachedRunMilestones]),
     pendingCardAwards,
     pendingCardChoices: nextPendingChoices,
+    temporaryAutoRerollLowest: 0,
     lastLaunch: result,
   };
 }
@@ -111,7 +115,7 @@ export function chooseCard(state: GameState, index: number, rng: Rng = new Mulbe
     runCards: [...state.runCards, card],
     pendingCardAwards: Math.max(0, state.pendingCardAwards - 1),
     pendingCardChoices: [],
-  }, card);
+  }, card, rng);
 
   return {
     ...nextState,
@@ -121,6 +125,13 @@ export function chooseCard(state: GameState, index: number, rng: Rng = new Mulbe
 
 export function startingMoneyFor(boughtMetaNodes: MetaNodeId[]): number {
   return boughtMetaNodes.includes('startingCapital') ? doubledStartingMoney : baseStartingMoney;
+}
+
+export function startingTemporaryAutoRerollLowest(boughtMetaNodes: MetaNodeId[]): number {
+  return boughtMetaNodes.reduce((total, nodeId) => {
+    const node = metaNodeById[nodeId];
+    return total + (node?.effect.type === 'autoRerollLowest' ? node.effect.amount : 0);
+  }, 0);
 }
 
 function uniqueNumbers(values: number[]): number[] {

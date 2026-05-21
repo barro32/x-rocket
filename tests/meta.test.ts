@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buyMetaNode, canBuyMetaNode, metaNodes } from '../src/sim/meta';
+import { buyMetaNode, canBuyMetaNode, metaNodes, positionedMetaNodes } from '../src/sim/meta';
+import { diceCategories } from '../src/sim/categories';
+import { startingDice } from '../src/sim/dice';
 import { createInitialState, restartRun, startingMoneyFor } from '../src/sim/game';
 
 describe('meta progression', () => {
@@ -31,21 +33,49 @@ describe('meta progression', () => {
     expect(nodesById['unlock-double-highest']).toBeDefined();
     expect(nodesById['unlock-top-bottom']).toBeDefined();
     expect(nodesById['unlock-plus3-minus1-thrusters']).toBeDefined();
-    expect(nodesById['unlock-plus2-fuel']).toBeDefined();
-    expect(nodesById['unlock-rare-die-guidance']?.label).toContain('x2 Guidance Dice');
+    expect(nodesById['unlock-plus3-side1-fuel']).toMatchObject({
+      effect: { type: 'unlockCard', cardId: 'plus3-side1-fuel' },
+    });
+    expect(nodesById['unlock-rare-die-guidance']?.label).toContain('x2 Guidance');
     expect(nodesById['unlock-all-faces-weight']).toBeDefined();
+    expect(nodesById['upgrade-random-face-card-thrusters']).toMatchObject({
+      effect: { type: 'upgradeRandomFaceCard', category: 'thrusters', amount: 2 },
+    });
+    expect(nodesById['reroll-lowest-0']).toMatchObject({
+      effect: { type: 'autoRerollLowest', amount: 1 },
+    });
+    expect(nodesById['reroll-lowest-1']).toMatchObject({
+      effect: { type: 'autoRerollLowest', amount: 1 },
+    });
+    expect(nodesById['unlock-s6-three-stats']).toMatchObject({
+      effect: { type: 'unlockCard', cardId: 's6-three-stats' },
+    });
     expect(nodesById['thrusters-4']).toBeDefined();
-    expect(nodesById['weight-5']).toBeDefined();
+    expect(nodesById['weight-4']).toBeDefined();
   });
 
-  it('uses unique valid cube coordinates for every meta node', () => {
-    const coords = new Set<string>();
+  it('has enough face upgrades for every stat to reach 543210', () => {
+    for (const category of diceCategories) {
+      const nodeIds = metaNodes
+        .filter((node) => node.effect.type === 'addFaceValue' && node.effect.category === category)
+        .map((node) => node.id);
+      const dice = startingDice(nodeIds);
 
-    for (const node of metaNodes) {
+      expect(dice[category].faces).toEqual([5, 4, 3, 2, 1, 0]);
+    }
+  });
+
+  it('derives unique valid cube coordinates for every meta node', () => {
+    const coords = new Set<string>();
+    const ids = new Set<string>();
+
+    for (const node of positionedMetaNodes) {
       expect(node.x + node.y + node.z).toBe(0);
       coords.add(`${node.x},${node.y},${node.z}`);
+      ids.add(node.id);
     }
 
     expect(coords.size).toBe(metaNodes.length);
+    expect(ids.size).toBe(metaNodes.length);
   });
 });

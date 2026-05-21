@@ -26,8 +26,10 @@ export interface LaunchRoll {
 
 export type CardEffect =
   | { type: 'addFaceValue'; category: DiceCategory; faceIndex: number; amount: number }
+  | { type: 'addRandomFaceValue'; category: DiceCategory; faceIndexes: number[]; amount: number }
+  | { type: 'addFaceValueToCategories'; categories: DiceCategory[]; faceIndex: number; amount: number }
   | { type: 'addAllFaces'; category: DiceCategory; amount: number }
-  | { type: 'multiplyDice'; category: DiceCategory; multiplier: number }
+  | { type: 'multiplyStat'; category: DiceCategory; multiplier: number }
   | { type: 'autoRerollLowest'; amount: number }
   | { type: 'doubleHighestRoll' }
   | { type: 'categoryDelta'; category: DiceCategory; amount: number; penaltyCategory?: DiceCategory; penaltyAmount?: number }
@@ -54,15 +56,14 @@ export type MetaNodeEffect =
   | { type: 'startingMoney' }
   | { type: 'addFaceValue'; category: DiceCategory; faceIndex: number; amount: number }
   | { type: 'addWeakestFace'; amount: number }
+  | { type: 'autoRerollLowest'; amount: number }
+  | { type: 'upgradeRandomFaceCard'; category: DiceCategory; amount: number }
   | { type: 'unlockCard'; cardId: string };
 
 export interface MetaNodeSpec {
   id: MetaNodeId;
   label: string;
   cost: number;
-  x: number;
-  y: number;
-  z: number;
   effect: MetaNodeEffect;
 }
 
@@ -71,9 +72,10 @@ export interface GameState {
   money: number;
   metaCurrency: number;
   boughtMetaNodes: MetaNodeId[];
-  dice: Record<DiceCategory, CategoryDie[]>;
+  dice: Record<DiceCategory, CategoryDie>;
   runCards: CardSpec[];
   autoRerollLowest: number;
+  temporaryAutoRerollLowest: number;
   launchCount: number;
   bankruptcies: number;
   bankruptcyRewardClaimed: boolean;

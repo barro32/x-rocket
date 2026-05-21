@@ -8,7 +8,7 @@ describe('roll resolution', () => {
   it('auto rerolls the lowest die once per launch after the rare card', () => {
     const roll = rollDice(
       startingDice([]),
-      new SequenceRng([0, 0.6, 0.6, 0.6, 0.6, 0.6]),
+      new SequenceRng([0.6, 0.2, 0.2, 0.2, 0.2, 0.2]),
       1,
       [],
     );
@@ -19,6 +19,16 @@ describe('roll resolution', () => {
     expect(roll.score).toBe(5);
   });
 
+  it('rolls current dice faces without applying card modifiers again', () => {
+    const dice = startingDice([]);
+    dice.thrusters.faces = [0, 0, 0, 2, 2, 2];
+    const roll = rollDice(dice, new SequenceRng([0.6, 0.2, 0.2, 0.2, 0.2]), 0, []);
+
+    expect(roll.rolls.find((rolled) => rolled.category === 'thrusters')?.value).toBe(2);
+    expect(roll.score).toBe(6);
+    expect(roll.exploded).toBe(false);
+  });
+
   it('doubles the highest roll from the unlocked rare card', () => {
     const card: CardSpec = {
       id: 'double-highest',
@@ -27,7 +37,7 @@ describe('roll resolution', () => {
       description: '2x highest roll',
       effect: { type: 'doubleHighestRoll' },
     };
-    const roll = rollDice(startingDice([]), new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6]), 0, [card]);
+    const roll = rollDice(startingDice([]), new SequenceRng([0.2, 0.2, 0.2, 0.2, 0.2]), 0, [card]);
 
     expect(roll.score).toBe(6);
   });
@@ -40,23 +50,22 @@ describe('roll resolution', () => {
       description: '+3 Thrusters, -1 Fuel',
       effect: { type: 'categoryDelta', category: 'thrusters', amount: 3, penaltyCategory: 'fuel', penaltyAmount: -1 },
     };
-    const roll = rollDice(startingDice([]), new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6]), 0, [card]);
+    const roll = rollDice(startingDice([]), new SequenceRng([0.2, 0.2, 0.2, 0.2, 0.2]), 0, [card]);
 
     expect(roll.score).toBe(7);
     expect(roll.exploded).toBe(true);
   });
 
-  it('multiplies all dice for a stat during the roll only', () => {
+  it('multiplies a stat during the roll only', () => {
     const card: CardSpec = {
       id: 'rare-die-thrusters',
-      name: 'x2 Thrusters Dice',
+      name: 'x2 Thrusters',
       rarity: 'rare',
-      description: 'x2 Thrusters dice',
-      effect: { type: 'multiplyDice', category: 'thrusters', multiplier: 2 },
+      description: 'x2 Thrusters roll',
+      effect: { type: 'multiplyStat', category: 'thrusters', multiplier: 2 },
     };
-    const roll = rollDice(startingDice([]), new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6, 0.6]), 0, [card]);
+    const roll = rollDice(startingDice([]), new SequenceRng([0.2, 0.2, 0.2, 0.2, 0.2]), 0, [card]);
 
-    expect(roll.rolls.filter((rolled) => rolled.category === 'thrusters')).toHaveLength(1);
     expect(roll.rolls.find((rolled) => rolled.category === 'thrusters')?.value).toBe(2);
     expect(roll.score).toBe(6);
   });
@@ -64,10 +73,10 @@ describe('roll resolution', () => {
   it('applies stat multiplication before stat penalties', () => {
     const x2Fuel: CardSpec = {
       id: 'rare-die-fuel',
-      name: 'x2 Fuel Dice',
+      name: 'x2 Fuel',
       rarity: 'rare',
-      description: 'x2 Fuel dice',
-      effect: { type: 'multiplyDice', category: 'fuel', multiplier: 2 },
+      description: 'x2 Fuel roll',
+      effect: { type: 'multiplyStat', category: 'fuel', multiplier: 2 },
     };
     const plusThrustersMinusFuel: CardSpec = {
       id: 'plus3-minus1-thrusters',
@@ -77,8 +86,8 @@ describe('roll resolution', () => {
       effect: { type: 'categoryDelta', category: 'thrusters', amount: 3, penaltyCategory: 'fuel', penaltyAmount: -1 },
     };
     const dice = startingDice([]);
-    dice.fuel[0].faces = [1, 1, 1, 2, 1, 1];
-    const roll = rollDice(dice, new SequenceRng([0.6, 0, 0.6, 0.6, 0.6]), 0, [x2Fuel, plusThrustersMinusFuel]);
+    dice.fuel.faces = [1, 1, 1, 2, 1, 1];
+    const roll = rollDice(dice, new SequenceRng([0.2, 0, 0.2, 0.2, 0.2]), 0, [x2Fuel, plusThrustersMinusFuel]);
     const fuelRoll = roll.rolls.find((rolled) => rolled.category === 'fuel');
 
     expect(fuelRoll?.value).toBe(1);
