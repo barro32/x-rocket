@@ -109,11 +109,11 @@ export function MetaGrid({
   }
 
   return (
-    <div className="meta-map-shell">
-      <div className="meta-map-controls" aria-label="Meta grid view controls">
-        <button onClick={() => zoom(0.82)} aria-label="Zoom in">+</button>
-        <button onClick={() => zoom(1.22)} aria-label="Zoom out">-</button>
-        <button onClick={() => onViewBoxChange(metrics.fitViewBox)}>Fit</button>
+    <div className="pointer-events-auto relative m-0 h-[min(720px,calc(100vh-142px))] min-h-0 w-full touch-none overflow-hidden rounded-lg border border-[rgba(160,181,210,0.2)] bg-[rgba(12,19,34,0.42)] max-[860px]:h-[min(520px,calc(100vh-180px))]">
+      <div className="absolute left-3 top-3 z-1 flex gap-1.5" aria-label="Meta grid view controls">
+        <button className="min-h-[34px] min-w-[34px] bg-[rgba(217,237,247,0.94)] px-2.5 py-1.5" onClick={() => zoom(0.82)} aria-label="Zoom in">+</button>
+        <button className="min-h-[34px] min-w-[34px] bg-[rgba(217,237,247,0.94)] px-2.5 py-1.5" onClick={() => zoom(1.22)} aria-label="Zoom out">-</button>
+        <button className="min-h-[34px] bg-[rgba(217,237,247,0.94)] px-2.5 py-1.5" onClick={() => onViewBoxChange(metrics.fitViewBox)}>Fit</button>
       </div>
       <svg
         className="hex-map"
@@ -137,10 +137,11 @@ export function MetaGrid({
             <g
               className={[
                 'hex-node',
+                'cursor-not-allowed outline-none',
                 category ? 'stat-themed' : '',
                 bought ? 'bought' : '',
                 unlocked ? '' : 'locked',
-                buyable ? 'buyable' : '',
+                buyable ? 'buyable cursor-pointer' : '',
                 temporary ? 'temporary' : '',
               ].filter(Boolean).join(' ')}
               key={node.id}
@@ -165,8 +166,8 @@ export function MetaGrid({
                 }
               }}
             >
-              <polygon points={metrics.points} />
-              <text className="hex-label">{compactMetaLabel(node.effect)}</text>
+              <polygon className="fill-[#152236] stroke-[#70839f] stroke-[1.5]" points={metrics.points} />
+              <text className="pointer-events-none fill-rocket-text text-[9px] font-bold [dominant-baseline:middle] [text-anchor:middle]">{compactMetaLabel(node.effect)}</text>
             </g>
           );
         })}

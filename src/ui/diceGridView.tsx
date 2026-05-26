@@ -20,17 +20,17 @@ interface DieModifier {
 export function DiceGrid({ state, compareTo, showRunEffects = true, previewCard }: DiceGridProps): ReactNode {
   return (
     <>
-      <div className="dice-grid">
+      <div>
         {diceCategories.map((category) => {
           const die = state.dice[category];
           return (
             <div
-              className="dice-row stat-themed"
+              className="stat-row grid grid-cols-[92px_1fr] gap-2 border-t border-[rgba(160,181,210,0.16)] py-2 pl-2"
               key={category}
               style={{ '--stat-color': categoryColors[category] } as React.CSSProperties}
             >
               <span>{categoryLabels[category]}</span>
-              <div className="dice-list">
+              <div className="grid gap-[5px]">
                 <DieFaces
                   category={category}
                   faces={die.faces}
@@ -60,14 +60,14 @@ function DieFaces({
 }): ReactNode {
   const compareDie = compareTo?.dice[category];
   return (
-    <div className="die">
-      <span className="die-faces">
+    <div className="flex items-center gap-1.5">
+      <span className="flex flex-wrap gap-[3px]">
         {faces.map((face, faceIndex) => {
           const beforeFace = compareDie?.faces[faceIndex];
           const changed = beforeFace !== undefined && beforeFace !== face;
           const direction = beforeFace !== undefined && face > beforeFace ? 'positive' : 'negative';
           return (
-            <span className={`die-face ${changed ? `changed ${direction}` : ''}`} key={faceIndex}>
+            <span className={dieFaceClass(changed, direction)} key={faceIndex}>
               {face}
             </span>
           );
@@ -80,13 +80,13 @@ function DieFaces({
 
 function ModifierColumn({ modifiers }: { modifiers: DieModifier[] }): ReactNode {
   if (modifiers.length === 0) {
-    return <span className="die-modifiers empty" />;
+    return <span className="inline-flex min-w-11" />;
   }
 
   return (
-    <span className="die-modifiers">
+    <span className="flex min-w-11 flex-wrap items-center gap-[3px]">
       {modifiers.map((modifier, index) => (
-        <span className={modifierClass(modifier)} key={`${modifier.value}-${index}`}>
+        <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 font-mono text-[11px] font-extrabold ${modifierClass(modifier)}`} key={`${modifier.value}-${index}`}>
           {modifier.value}
         </span>
       ))}
@@ -106,7 +106,7 @@ function RunEffects({ state }: { state: DiceGridState }): ReactNode {
   ];
 
   if (rows.length === 0) {
-    return <div className="run-effects"><span>-</span></div>;
+    return <div className="flex flex-wrap gap-1.5 border-t border-[rgba(160,181,210,0.16)] pt-2"><span className="rounded-full border border-[rgba(160,181,210,0.24)] px-[7px] py-[3px] text-xs text-[#c8d6e8]">-</span></div>;
   }
 
   return <EffectRows rows={rows} compact />;
@@ -182,12 +182,25 @@ function signed(amount: number): string {
 
 function modifierClass(modifier: DieModifier): string {
   if (modifier.value.startsWith('x')) {
-    return 'multiplier';
+    return 'border-[rgba(142,246,197,0.48)] bg-[rgba(142,246,197,0.16)] text-rocket-green';
   }
 
   if (modifier.value.startsWith('-')) {
-    return 'negative';
+    return 'border-[rgba(255,90,95,0.48)] bg-[rgba(255,90,95,0.16)] text-[#ffb4b7]';
   }
 
-  return modifier.preview ? 'preview' : '';
+  return modifier.preview
+    ? 'border-[rgba(142,246,197,0.48)] bg-[rgba(142,246,197,0.16)] text-rocket-green'
+    : 'border-[rgba(160,181,210,0.34)] bg-[rgba(160,181,210,0.14)] text-rocket-text';
+}
+
+function dieFaceClass(changed: boolean, direction: 'positive' | 'negative'): string {
+  const base = 'inline-flex h-5 min-w-5 items-center justify-center rounded border border-[rgba(160,181,210,0.24)] bg-[rgba(216,226,240,0.08)] px-1 font-mono text-xs text-rocket-text';
+  if (!changed) {
+    return base;
+  }
+
+  return direction === 'positive'
+    ? `${base} border-rocket-green bg-[rgba(142,246,197,0.18)] font-extrabold text-rocket-green`
+    : `${base} border-rocket-red bg-[rgba(255,90,95,0.18)] font-extrabold text-[#ffb4b7]`;
 }

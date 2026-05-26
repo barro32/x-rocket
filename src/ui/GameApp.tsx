@@ -61,30 +61,30 @@ export function GameApp(): ReactNode {
   }
 
   return (
-    <div className="game-ui">
-      <section className="top-panel">
+    <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(11,16,32,0.72),rgba(11,16,32,0.94)),radial-gradient(circle_at_50%_28%,rgba(95,179,179,0.16),transparent_34%),#0b1020]">
+      <section className="absolute inset-x-0 top-0 flex min-h-[76px] items-center gap-4 border-b border-[rgba(160,181,210,0.25)] bg-[rgba(12,19,34,0.9)] px-[22px] py-3 max-[860px]:flex-wrap">
         <TopStat label="Money" value={`$${state.money}`} />
         <TopStat label="Launch Cost" value={`$${launchCost}`} />
         <TopStat label="Meta" value={state.metaCurrency} />
         <TopStat label="Best" value={`${state.highestAltitudeMeters}m`} />
-        <div className="menu">
+        <div className="pointer-events-auto relative ml-auto">
           <button onClick={() => setMenuOpen((open) => !open)}>Menu</button>
-          <div className="menu-popover" hidden={!menuOpen}>
-            <button onClick={() => setShowUnlockedCards(true)}>Unlocked Cards</button>
-            <button onClick={reset}>Reset Save</button>
+          <div className="absolute right-0 top-[calc(100%+8px)] z-2 w-40 rounded-lg border border-[rgba(160,181,210,0.35)] bg-rocket-panel p-2" hidden={!menuOpen}>
+            <button className="w-full" onClick={() => setShowUnlockedCards(true)}>Unlocked Cards</button>
+            <button className="mt-1.5 w-full" onClick={reset}>Reset Save</button>
           </div>
         </div>
       </section>
 
-      <main className="result-panel">
+      <main className="pointer-events-auto absolute left-7 right-[402px] top-24 max-[860px]:left-3 max-[860px]:right-3 max-[860px]:top-[136px]">
         <LaunchResultView state={state} />
       </main>
 
-      <section className="launch-panel">
-        <button onClick={launch} disabled={bankrupt || state.pendingCardChoices.length > 0}>Launch</button>
+      <section className="pointer-events-auto absolute bottom-7 left-1/2 -translate-x-1/2 max-[860px]:bottom-4">
+        <button className="min-h-[54px] min-w-45 border-rocket-gold text-xl shadow-[0_10px_34px_rgba(0,0,0,0.35)]" onClick={launch} disabled={bankrupt || state.pendingCardChoices.length > 0}>Launch</button>
       </section>
 
-      <section className="side-panel">
+      <section className="pointer-events-auto absolute right-[18px] top-24 max-h-[calc(100vh-116px)] w-[360px] overflow-auto rounded-lg border border-[rgba(160,181,210,0.25)] bg-[rgba(12,19,34,0.88)] p-3.5 max-[860px]:left-3 max-[860px]:right-3 max-[860px]:top-[420px] max-[860px]:w-auto">
         <h2>Dice</h2>
         <DiceGrid state={state} />
       </section>
@@ -100,12 +100,12 @@ export function GameApp(): ReactNode {
 
       {showUnlockedCards ? <UnlockedCards state={state} onClose={() => setShowUnlockedCards(false)} /> : null}
 
-      <section className="meta-panel" hidden={!bankrupt}>
-        <div className="meta-header">
+      <section className="pointer-events-auto fixed inset-0 flex flex-col items-stretch justify-start bg-[rgba(5,9,16,0.86)] px-7 pb-7 pt-[72px] text-rocket-text" hidden={!bankrupt}>
+        <div className="mx-auto flex w-full max-w-[1240px] items-center justify-between">
           <h2>Meta Grid</h2>
           <button onClick={restart}>Start Next Run</button>
         </div>
-        <div className="meta-body">
+        <div className="mx-auto mt-[18px] grid min-h-0 w-full max-w-[1540px] grid-cols-[minmax(560px,1fr)_minmax(360px,460px)] gap-[22px] max-[860px]:grid-cols-1">
           <MetaGrid
             state={state}
             viewBox={metaViewBox}
@@ -115,7 +115,7 @@ export function GameApp(): ReactNode {
             onSuppressClickUntil={setSuppressMetaClickUntil}
             onViewBoxChange={setMetaViewBox}
           />
-          <div className="meta-preview">
+          <div className="max-h-[min(720px,calc(100vh-142px))] overflow-auto rounded-lg border border-[rgba(160,181,210,0.24)] bg-[rgba(12,19,34,0.86)] p-[18px] max-[860px]:max-h-[280px]">
             <MetaPreview state={state} id={selectedMetaId} />
           </div>
         </div>
@@ -126,9 +126,9 @@ export function GameApp(): ReactNode {
 
 function TopStat({ label, value }: { label: string; value: ReactNode }): ReactNode {
   return (
-    <div>
-      <div className="label">{label}</div>
-      <strong>{value}</strong>
+    <div className="min-w-[86px]">
+      <div className="text-xs uppercase tracking-normal text-rocket-muted">{label}</div>
+      <strong className="text-2xl">{value}</strong>
     </div>
   );
 }
@@ -137,21 +137,21 @@ function LaunchResultView({ state }: { state: GameState }): ReactNode {
   const result = state.lastLaunch;
   if (!result) {
     return (
-      <section className="launch-result empty">
+      <section className="max-w-[860px] rounded-lg border border-[rgba(160,181,210,0.22)] bg-[rgba(12,19,34,0.74)] p-[18px]">
         <h1>X Rocket</h1>
-        <p>Launch to roll your dice and apply active card modifiers.</p>
+        <p className="m-0 mb-2.5 text-[#c8d6e8]">Launch to roll your dice and apply active card modifiers.</p>
       </section>
     );
   }
 
   return (
-    <section className="launch-result">
-      <div className="launch-result-header">
+    <section className="max-w-[860px] rounded-lg border border-[rgba(160,181,210,0.22)] bg-[rgba(12,19,34,0.74)] p-[18px]">
+      <div className="mb-2.5 flex items-center justify-between">
         <div>
-          <h1>Launch {state.launchCount}</h1>
-          <p>{result.message}</p>
+          <h1 className="m-0 text-[28px]">Launch {state.launchCount}</h1>
+          <p className="m-0 mb-2.5 text-[#c8d6e8]">{result.message}</p>
         </div>
-        <strong>{result.heightMeters}m</strong>
+        <strong className="text-2xl text-[#ffe4a6]">{result.heightMeters}m</strong>
       </div>
       <RollShowcase result={result} />
       <EventLog result={result} />
@@ -162,7 +162,7 @@ function LaunchResultView({ state }: { state: GameState }): ReactNode {
 
 function RollShowcase({ result }: { result: LaunchResult }): ReactNode {
   return (
-    <div className="roll-showcase">
+    <div className="mb-3 grid grid-cols-5 gap-2 max-[860px]:grid-cols-2">
       {result.roll.rolls.map((roll) => {
         const modifiers = [
           ...(roll.rerolledFrom !== undefined ? [`Reroll: ${roll.rerolledFrom} -> ${roll.value}`] : []),
@@ -170,15 +170,15 @@ function RollShowcase({ result }: { result: LaunchResult }): ReactNode {
         ];
         return (
           <article
-            className={`roll-card revealed ${roll.value === 0 ? 'zero' : ''}`}
+            className={`roll-card aspect-square min-h-0 -translate-y-0.5 rounded-md border p-2 flex flex-col items-center justify-center transition ${roll.value === 0 ? 'border-rocket-red bg-[rgba(255,90,95,0.24)]' : ''}`}
             key={roll.dieId}
             style={{ '--stat-color': categoryColors[roll.category] } as React.CSSProperties}
           >
             <span>{categoryLabels[roll.category]}</span>
-            <strong>{roll.value}</strong>
-            <div className="roll-breakdown">
-              <span>Initial: {roll.initialValue}</span>
-              {modifiers.map((modifier) => <span key={modifier}>{modifier}</span>)}
+            <strong className={`font-mono text-[34px] leading-none ${roll.value === 0 ? 'text-[#ffb4b7]' : 'text-white'}`}>{roll.value}</strong>
+            <div className="mt-[7px] flex min-h-8 flex-wrap items-center justify-center gap-[3px]">
+              <span className="roll-breakdown-chip whitespace-nowrap rounded border px-1 py-[3px] text-center text-[9px] font-extrabold leading-none">Initial: {roll.initialValue}</span>
+              {modifiers.map((modifier) => <span className="roll-breakdown-chip whitespace-nowrap rounded border px-1 py-[3px] text-center text-[9px] font-extrabold leading-none" key={modifier}>{modifier}</span>)}
             </div>
           </article>
         );
@@ -189,7 +189,7 @@ function RollShowcase({ result }: { result: LaunchResult }): ReactNode {
 
 function EventLog({ result }: { result: LaunchResult }): ReactNode {
   return (
-    <table className="event-log">
+    <table className="mt-3">
       <thead>
         <tr>
           <th>Step</th>
@@ -211,7 +211,7 @@ function EventRow({ event, step }: { event: RollEvent; step: number }): ReactNod
       <tr>
         <td>{step}. Roll</td>
         <td>{category}</td>
-        <td className={event.value === 0 ? 'zero' : ''}>{event.value}</td>
+        <td className={event.value === 0 ? 'font-extrabold text-[#ff776d]' : ''}>{event.value}</td>
       </tr>
     );
   }
@@ -221,7 +221,7 @@ function EventRow({ event, step }: { event: RollEvent; step: number }): ReactNod
       <tr>
         <td>{step}. Reroll lowest</td>
         <td>{category}</td>
-        <td className={event.after === 0 ? 'zero' : ''}>{event.before} -&gt; {event.after}</td>
+        <td className={event.after === 0 ? 'font-extrabold text-[#ff776d]' : ''}>{event.before} -&gt; {event.after}</td>
       </tr>
     );
   }
@@ -230,7 +230,7 @@ function EventRow({ event, step }: { event: RollEvent; step: number }): ReactNod
     <tr>
       <td>{step}. {event.cardName}</td>
       <td>{category}</td>
-      <td className={event.after === 0 ? 'zero' : ''}>{event.label}: {event.before} -&gt; {event.after}</td>
+      <td className={event.after === 0 ? 'font-extrabold text-[#ff776d]' : ''}>{event.label}: {event.before} -&gt; {event.after}</td>
     </tr>
   );
 }
@@ -241,8 +241,8 @@ function Milestones({ result }: { result: LaunchResult }): ReactNode {
   }
 
   return (
-    <div className="milestones">
-      {result.reachedRunMilestones.map((milestone) => <span className="hit" key={milestone}>{milestone}m reached</span>)}
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {result.reachedRunMilestones.map((milestone) => <span className="rounded-full border border-rocket-green bg-rocket-green px-2 py-1 text-rocket-bg" key={milestone}>{milestone}m reached</span>)}
     </div>
   );
 }
@@ -259,14 +259,14 @@ function CardPicker({
   onChooseCard: (index: number) => void;
 }): ReactNode {
   return (
-    <div className="modal-shade">
-      <section className="card-picker">
+    <div className="pointer-events-auto fixed inset-0 flex items-center justify-center bg-[rgba(5,9,16,0.72)]">
+      <section className="w-[min(1120px,calc(100vw-36px))] rounded-lg border border-[rgba(160,181,210,0.35)] bg-rocket-panel p-[22px] text-rocket-text">
         <h2>Choose an Upgrade</h2>
-        <div className="card-picker-body">
-          <div className="cards">
+        <div className="grid grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] gap-[18px] max-[860px]:grid-cols-1">
+          <div className="grid grid-cols-3 gap-3.5 max-[860px]:grid-cols-1">
             {state.pendingCardChoices.map((card, index) => (
               <button
-                className={`card ${card.rarity} ${statThemeClass(cardCategories(card))}`}
+                className={`flex min-h-[170px] min-w-0 flex-col items-start rounded-md border bg-rocket-panel-soft p-2.5 text-left text-rocket-text ${rarityClass(card.rarity)} ${statThemeClass(cardCategories(card))}`}
                 key={card.id}
                 style={statThemeStyle(cardCategories(card))}
                 onMouseEnter={() => onSelectCard(index)}
@@ -277,7 +277,7 @@ function CardPicker({
               </button>
             ))}
           </div>
-          <div className="card-preview">
+          <div className="rounded-lg border border-[rgba(160,181,210,0.24)] bg-[rgba(12,19,34,0.72)] p-3.5">
             <CardPreview state={state} index={selectedCardIndex} />
           </div>
         </div>
@@ -289,23 +289,23 @@ function CardPicker({
 function UnlockedCards({ state, onClose }: { state: GameState; onClose: () => void }): ReactNode {
   const cards = unlockedCardPoolFor(state.boughtMetaNodes);
   return (
-    <div className="modal-shade">
-      <section className="card-library">
-        <div className="card-library-header">
+    <div className="pointer-events-auto fixed inset-0 flex items-center justify-center bg-[rgba(5,9,16,0.72)]">
+      <section className="max-h-[min(760px,calc(100vh-36px))] w-[min(980px,calc(100vw-36px))] overflow-auto rounded-lg border border-[rgba(160,181,210,0.35)] bg-rocket-panel p-[22px] text-rocket-text">
+        <div className="mb-4 flex items-center justify-between">
           <h2>Unlocked Cards</h2>
           <button onClick={onClose}>Close</button>
         </div>
-        <div className="card-library-list">
+        <div className="grid grid-cols-2 gap-2.5 max-[860px]:grid-cols-1">
           {cards.map((card) => (
             <article
-              className={`card-library-card ${card.rarity} ${statThemeClass(card.affectedCategories)}`}
+              className={`flex min-h-24 items-start justify-between gap-3 rounded-lg border bg-rocket-panel-soft p-3 ${rarityClass(card.rarity)} ${statThemeClass(card.affectedCategories)}`}
               key={card.id}
               style={statThemeStyle(card.affectedCategories)}
             >
               <div>
                 <CardPoolSummary card={card} />
               </div>
-              <small>{card.source === 'base' ? 'Base' : 'Meta'}</small>
+              <small className="shrink-0 rounded-full border border-[rgba(160,181,210,0.24)] px-2 py-[3px] text-[11px] text-[#c8d6e8]">{card.source === 'base' ? 'Base' : 'Meta'}</small>
             </article>
           ))}
         </div>
@@ -318,7 +318,7 @@ function CardPreview({ state, index }: { state: GameState; index: number }): Rea
   const card = state.pendingCardChoices[index];
   const after = card ? previewCardState(state, card) : state;
   return (
-    <div className="preview-grid">
+    <div className="grid grid-cols-1 gap-3">
       <div>
         <DiceGrid state={after} compareTo={state} showRunEffects={false} previewCard={card} />
         {card ? <RollOnlyCardSummary card={card} /> : null}
@@ -341,10 +341,10 @@ function MetaPreview({ state, id }: { state: GameState; id?: MetaNodeId }): Reac
 
   return (
     <>
-      <div className="meta-preview-summary">
+      <div className="mb-3 border-b border-[rgba(160,181,210,0.16)] pb-3.5">
         {node ? <MetaNodeSummary node={node} /> : <h3>Select an upgrade</h3>}
-        <div className={`meta-preview-money ${moneyChanged ? 'changed' : ''}`}>${after.money}</div>
-        <span>{status}</span>
+        <div className={`text-[28px] font-extrabold ${moneyChanged ? 'text-[#ffe4a6]' : 'text-rocket-text'}`}>${after.money}</div>
+        <span className="mt-1 block text-[13px] text-rocket-muted">{status}</span>
       </div>
       <DiceGrid state={after} compareTo={before} showRunEffects={false} />
     </>
@@ -377,11 +377,22 @@ function cardCategories(card: CardSpec): DiceCategory[] {
 }
 
 function statThemeClass(categories: DiceCategory[]): string {
-  return categories.length > 0 ? 'stat-themed' : '';
+  return categories.length > 0 ? 'stat-surface' : '';
 }
 
 function statThemeStyle(categories: DiceCategory[]): React.CSSProperties | undefined {
   return categories.length > 0 ? ({ '--card-bg': cardBackground(categories) } as React.CSSProperties) : undefined;
+}
+
+function rarityClass(rarity: CardSpec['rarity']): string {
+  switch (rarity) {
+    case 'common':
+      return 'border-[#647892]';
+    case 'uncommon':
+      return 'border-2 border-rocket-green';
+    case 'rare':
+      return 'border-[3px] border-rocket-gold';
+  }
 }
 
 function cardBackground(categories: DiceCategory[]): string {

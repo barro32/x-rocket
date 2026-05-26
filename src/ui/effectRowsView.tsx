@@ -18,7 +18,7 @@ export function CardSummary({ card }: { card: CardSpec }): ReactNode {
 export function CardPoolSummary({ card }: { card: CardPoolEntry }): ReactNode {
   return (
     <>
-      <strong>{cardPoolTitle(card)}</strong>
+      <strong className="my-1.5 block text-base">{cardPoolTitle(card)}</strong>
       <EffectRows rows={cardPoolEffectRows(card)} compact />
     </>
   );
@@ -27,7 +27,7 @@ export function CardPoolSummary({ card }: { card: CardPoolEntry }): ReactNode {
 export function MetaNodeSummary({ node }: { node: MetaNodeSpec }): ReactNode {
   return (
     <>
-      <h3>{metaNodeTitle(node)}</h3>
+      <h3 className="m-0 mb-2.5 text-lg">{metaNodeTitle(node)}</h3>
       <EffectRows rows={metaEffectRows(node.effect)} />
     </>
   );
@@ -40,17 +40,17 @@ export function RollOnlyCardSummary({ card }: { card: CardSpec }): ReactNode {
 
 export function EffectRows({ rows, compact = false }: { rows: EffectRow[]; compact?: boolean }): ReactNode {
   return (
-    <div className={`effect-rows ${compact ? 'compact' : ''}`}>
+    <div className={`grid w-full ${compact ? 'mt-2 gap-[5px]' : 'gap-1.5'}`}>
       {rows.map((row, index) => (
         <div
-          className={`effect-row ${row.category ? 'stat-themed' : ''}`}
+          className={`effect-row grid min-w-0 items-center rounded-md border border-[rgba(160,181,210,0.18)] bg-[rgba(5,9,16,0.28)] ${compact ? 'grid-cols-[minmax(0,0.9fr)_minmax(0,1.05fr)_auto] gap-[5px] px-[7px] py-1.5 text-[11px]' : 'grid-cols-[minmax(66px,0.9fr)_minmax(76px,1.1fr)_auto] gap-2 px-2 py-[7px]'} ${row.category ? 'stat-themed' : ''}`}
           key={`${row.dice}-${row.target}-${row.value}-${index}`}
           style={row.category ? ({ '--stat-color': categoryColors[row.category] } as React.CSSProperties) : undefined}
         >
-          <span className="effect-dice">{row.dice}</span>
-          <span className="effect-target">{row.target}</span>
-          <span className={`effect-value ${effectValueClass(row.value)}`}>{row.value}</span>
-          {row.note ? <span className="effect-note">{row.note}</span> : null}
+          <span className="effect-dice min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-extrabold">{row.dice}</span>
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[#c8d6e8]">{row.target}</span>
+          <span className={`whitespace-nowrap rounded-full border px-[7px] py-0.5 font-mono font-extrabold ${compact ? 'px-[5px]' : ''} ${effectValueClass(row.value)}`}>{row.value}</span>
+          {row.note ? <span className="col-span-full min-w-0 text-[11px] text-[#c8d6e8]">{row.note}</span> : null}
         </div>
       ))}
     </div>
@@ -252,18 +252,18 @@ function rerollValue(amount: number): string {
 
 function effectValueClass(value: string): string {
   if (value.startsWith('x')) {
-    return 'multiplier';
+    return 'border-[rgba(142,246,197,0.48)] bg-[rgba(142,246,197,0.16)] text-rocket-green';
   }
 
   if (value.startsWith('-')) {
-    return 'negative';
+    return 'border-[rgba(255,90,95,0.48)] bg-[rgba(255,90,95,0.16)] text-[#ffb4b7]';
   }
 
   if (value.startsWith('+')) {
-    return 'positive';
+    return 'border-[rgba(142,246,197,0.48)] bg-[rgba(142,246,197,0.16)] text-rocket-green';
   }
 
-  return '';
+  return 'border-[rgba(160,181,210,0.32)] bg-[rgba(160,181,210,0.14)] text-rocket-text';
 }
 
 function matchCategoryCard(cardId: string, prefix: string): DiceCategory | undefined {
