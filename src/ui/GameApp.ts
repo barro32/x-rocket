@@ -1,57 +1,33 @@
-import Phaser from 'phaser';
 import { buyMetaNode, canBuyMetaNode, metaNodeById } from '../sim/meta';
 import { claimBankruptcyReward, chooseCard, createInitialState, isBankrupt, launchCost, restartRun, simulateLaunch, startingMoneyFor, startingTemporaryAutoRerollLowest } from '../sim/game';
 import { applyCard, startingDice } from '../sim/dice';
 import { unlockedCardPoolFor } from '../sim/cards';
 import { clearSave, loadGame, saveGame } from '../sim/save';
-import type { CardSpec, DiceCategory, GameState, MetaNodeId } from '../sim/types';
-import { categoryColors } from '../sim/categories';
+import type { CardSpec, DiceCategory, GameState, LaunchResult, MetaNodeId, RollEvent } from '../sim/types';
+import { categoryColors, categoryLabels } from '../sim/categories';
 import { renderDiceGrid } from './diceGridView';
 import { escapeHtml, renderMetaGrid } from './metaGridView';
-import { RocketView } from './RocketView';
-import { RollStage } from './RollStage';
 
-export class GameScene extends Phaser.Scene {
-  private state!: GameState;
-  private rocket!: RocketView;
-  private rollStage!: RollStage;
-  private ui!: HTMLDivElement;
-  private busy = false;
+export class GameApp {
+  private state: GameState;
+  private readonly ui: HTMLDivElement;
   private showUnlockedCards = false;
-  private rollingLaunch = false;
 
-  constructor() {
-    super('GameScene');
-  }
-
-  create(): void {
+  constructor(root: HTMLElement) {
     this.state = loadGame();
-    this.rocket = new RocketView(this);
-    this.rocket.createWorld();
-    this.rollStage = new RollStage(this);
     this.ui = document.createElement('div');
     this.ui.className = 'game-ui';
-    document.body.append(this.ui);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.ui.remove());
+    root.append(this.ui);
     this.render();
   }
 
-  private async launch(): Promise<void> {
-    if (this.busy || this.state.pendingCardChoices.length > 0 || isBankrupt(this.state)) {
+  private launch(): void {
+    if (this.state.pendingCardChoices.length > 0 || isBankrupt(this.state)) {
       return;
     }
 
-    this.busy = true;
-    this.render();
-    const next = simulateLaunch(this.state);
-    this.state = next;
+    this.state = simulateLaunch(this.state);
     saveGame(this.state);
-    this.rollingLaunch = true;
-    this.render();
-    await this.rollStage.play(next.lastLaunch);
-    await this.rocket.animateLaunch(next.lastLaunch);
-    this.rollingLaunch = false;
-    this.busy = false;
     this.render();
   }
 
@@ -89,8 +65,12 @@ export class GameScene extends Phaser.Scene {
         </div>
       </section>
 
+      <main class="result-panel">
+        ${this.renderLaunchResult()}
+      </main>
+
       <section class="launch-panel">
-        <button data-action="launch" ${this.busy || bankrupt || this.state.pendingCardChoices.length > 0 ? 'disabled' : ''}>Launch</button>
+        <button data-action="launch" ${bankrupt || this.state.pendingCardChoices.length > 0 ? 'disabled' : ''}>Launch</button>
       </section>
 
       <section class="side-panel">
@@ -98,7 +78,7 @@ export class GameScene extends Phaser.Scene {
         ${renderDiceGrid(this.state)}
       </section>
 
-      ${this.state.pendingCardChoices.length > 0 && !this.rollingLaunch ? this.renderCards() : ''}
+      ${this.state.pendingCardChoices.length > 0 ? this.renderCards() : ''}
       ${this.showUnlockedCards ? this.renderUnlockedCards() : ''}
 
       <section class="meta-panel" ${bankrupt ? '' : 'hidden'}>
@@ -123,7 +103,7 @@ export class GameScene extends Phaser.Scene {
       element.addEventListener('click', () => {
         const action = element.dataset.action;
         if (action === 'launch') {
-          void this.launch();
+          this.launch();
         } else if (action === 'toggle-menu') {
           this.ui.querySelector('.menu-popover')?.toggleAttribute('hidden');
         } else if (action === 'show-unlocked-cards') {
@@ -187,6 +167,117 @@ export class GameScene extends Phaser.Scene {
         }
       });
     });
+  }
+
+  private renderLaunchResult(): string {
+    const result = this.state.lastLaunch;
+    if (!result) {
+      return `
+        <section class="launch-result empty">
+          <h1>X Rocket</h1>
+          <p>Launch to roll your dice and apply active card modifiers.</p>
+        </section>
+      `;
+    }
+
+    return `
+      <section class="launch-result">
+        <div class="launch-result-header">
+          <div>
+            <h1>Launch ${this.state.launchCount}</h1>
+            <p>${escapeHtml(result.message)}</p>
+          </div>
+          <strong>${result.heightMeters}m</strong>
+        </div>
+        ${this.renderRollShowcase(result)}
+        ${this.renderEventLog(result)}
+        ${this.renderMilestones(result)}
+      </section>
+    `;
+  }
+
+  private renderRollShowcase(result: LaunchResult): string {
+    return `
+      <div class="roll-showcase">
+        ${result.roll.rolls.map((roll) => {
+          const modifiers = [
+            ...(roll.rerolledFrom !== undefined ? [`${roll.rerolledFrom} -> ${roll.value}`] : []),
+            ...roll.modifiers.map((modifier) => `${modifier.before} ${modifier.label} ${modifier.after}`),
+          ];
+          return `
+            <article class="roll-card revealed ${roll.value === 0 ? 'zero' : ''}" style="--stat-color: ${categoryColors[roll.category]}">
+              <span>${escapeHtml(categoryLabels[roll.category])}</span>
+              <strong>${roll.value}</strong>
+              <div class="roll-breakdown">
+                <span>Initial ${roll.initialValue}</span>
+                ${modifiers.map((modifier) => `<span>${escapeHtml(modifier)}</span>`).join('')}
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  private renderEventLog(result: LaunchResult): string {
+    return `
+      <table class="event-log">
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Category</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${result.roll.events.map((event, index) => this.renderEventRow(event, index + 1)).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  private renderEventRow(event: RollEvent, step: number): string {
+    const category = categoryLabels[event.category];
+    if (event.type === 'initialRoll') {
+      return `
+        <tr>
+          <td>${step}. Roll</td>
+          <td>${escapeHtml(category)}</td>
+          <td class="${event.value === 0 ? 'zero' : ''}">${event.value}</td>
+        </tr>
+      `;
+    }
+
+    if (event.type === 'reroll') {
+      return `
+        <tr>
+          <td>${step}. Reroll lowest</td>
+          <td>${escapeHtml(category)}</td>
+          <td class="${event.after === 0 ? 'zero' : ''}">${event.before} -> ${event.after}</td>
+        </tr>
+      `;
+    }
+
+    return `
+      <tr>
+        <td>${step}. ${escapeHtml(event.cardName)}</td>
+        <td>${escapeHtml(category)}</td>
+        <td class="${event.after === 0 ? 'zero' : ''}">${event.before} ${escapeHtml(event.label)} ${event.after}</td>
+      </tr>
+    `;
+  }
+
+  private renderMilestones(result: LaunchResult): string {
+    const milestones = result.reachedRunMilestones;
+    if (milestones.length === 0) {
+      return '';
+    }
+
+    return `
+      <div class="milestones">
+        ${milestones.map((milestone) => `<span class="hit">${milestone}m reached</span>`).join('')}
+      </div>
+    `;
   }
 
   private renderCards(): string {
@@ -291,7 +382,6 @@ export class GameScene extends Phaser.Scene {
       ${node?.effect.type === 'unlockCard' && buyable ? `<div class="run-effects"><span>${escapeHtml(node.label)}</span></div>` : ''}
     `;
   }
-
 }
 
 function cardCategories(card: CardSpec): DiceCategory[] {

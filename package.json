@@ -17,13 +17,8 @@
     "dist": "npm run build && electron-builder",
     "test": "vitest run"
   },
-  "dependencies": {
-    "phaser": "^4.1.0",
-    "three": "^0.184.0"
-  },
   "devDependencies": {
     "@types/node": "^24.10.0",
-    "@types/three": "^0.184.1",
     "cross-env": "^10.1.0",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",

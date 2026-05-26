@@ -14,10 +14,6 @@ body,
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-canvas {
-  display: block;
-}
-
 button {
   border: 1px solid #6b7f99;
   border-radius: 6px;
@@ -36,6 +32,10 @@ button:disabled {
 }
 
 .game-ui {
+  background:
+    linear-gradient(rgba(11, 16, 32, 0.72), rgba(11, 16, 32, 0.94)),
+    radial-gradient(circle at 50% 28%, rgba(95, 179, 179, 0.16), transparent 34%),
+    #0b1020;
   inset: 0;
   pointer-events: none;
   position: fixed;
@@ -104,6 +104,14 @@ button:disabled {
   font-size: 20px;
   min-height: 54px;
   min-width: 180px;
+}
+
+.result-panel {
+  left: 28px;
+  pointer-events: auto;
+  position: absolute;
+  right: 402px;
+  top: 96px;
 }
 
 .top-panel > div {
@@ -221,7 +229,16 @@ h2 {
 }
 
 .launch-result {
-  margin-top: 18px;
+  background: rgba(12, 19, 34, 0.74);
+  border: 1px solid rgba(160, 181, 210, 0.22);
+  border-radius: 8px;
+  max-width: 860px;
+  padding: 18px;
+}
+
+.launch-result h1 {
+  font-size: 28px;
+  margin: 0;
 }
 
 .launch-result.empty p,
@@ -326,6 +343,10 @@ td {
 td.zero {
   color: #ff776d;
   font-weight: 800;
+}
+
+.event-log {
+  margin-top: 12px;
 }
 
 .milestones {
@@ -702,8 +723,18 @@ td.zero {
   .side-panel {
     left: 12px;
     right: 12px;
-    top: 136px;
+    top: 420px;
     width: auto;
+  }
+
+  .result-panel {
+    left: 12px;
+    right: 12px;
+    top: 136px;
+  }
+
+  .roll-showcase {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cards {

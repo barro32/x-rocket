@@ -1,20 +1,10 @@
-import Phaser from 'phaser';
 import './styles/base.css';
-import { GameScene } from './ui/GameScene';
+import { GameApp } from './ui/GameApp';
 
-const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
-  parent: 'app',
-  width: 1280,
-  height: 720,
-  backgroundColor: '#0b1020',
-  pixelArt: true,
-  roundPixels: true,
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-  },
-  scene: [GameScene],
-};
+const root = document.querySelector<HTMLElement>('#app');
 
-new Phaser.Game(config);
+if (!root) {
+  throw new Error('Missing #app root');
+}
+
+new GameApp(root);
