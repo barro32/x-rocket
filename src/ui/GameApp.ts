@@ -6,6 +6,7 @@ import { clearSave, loadGame, saveGame } from '../sim/save';
 import type { CardSpec, DiceCategory, GameState, LaunchResult, MetaNodeId, RollEvent } from '../sim/types';
 import { categoryColors, categoryLabels } from '../sim/categories';
 import { renderDiceGrid } from './diceGridView';
+import { renderCardPoolSummary, renderCardSummary, renderMetaNodeSummary, renderRollOnlyCardSummary } from './effectRowsView';
 import { escapeHtml, renderMetaGrid } from './metaGridView';
 
 type ViewBox = { x: number; y: number; width: number; height: number };
@@ -361,15 +362,15 @@ export class GameApp {
       <div class="roll-showcase">
         ${result.roll.rolls.map((roll) => {
           const modifiers = [
-            ...(roll.rerolledFrom !== undefined ? [`${roll.rerolledFrom} -> ${roll.value}`] : []),
-            ...roll.modifiers.map((modifier) => `${modifier.before} ${modifier.label} ${modifier.after}`),
+            ...(roll.rerolledFrom !== undefined ? [`Reroll: ${roll.rerolledFrom} -> ${roll.value}`] : []),
+            ...roll.modifiers.map((modifier) => `${modifier.label}: ${modifier.before} -> ${modifier.after}`),
           ];
           return `
             <article class="roll-card revealed ${roll.value === 0 ? 'zero' : ''}" style="--stat-color: ${categoryColors[roll.category]}">
               <span>${escapeHtml(categoryLabels[roll.category])}</span>
               <strong>${roll.value}</strong>
               <div class="roll-breakdown">
-                <span>Initial ${roll.initialValue}</span>
+                <span>Initial: ${roll.initialValue}</span>
                 ${modifiers.map((modifier) => `<span>${escapeHtml(modifier)}</span>`).join('')}
               </div>
             </article>
@@ -422,7 +423,7 @@ export class GameApp {
       <tr>
         <td>${step}. ${escapeHtml(event.cardName)}</td>
         <td>${escapeHtml(category)}</td>
-        <td class="${event.after === 0 ? 'zero' : ''}">${event.before} ${escapeHtml(event.label)} ${event.after}</td>
+        <td class="${event.after === 0 ? 'zero' : ''}">${escapeHtml(event.label)}: ${event.before} -> ${event.after}</td>
       </tr>
     `;
   }
@@ -449,8 +450,7 @@ export class GameApp {
             <div class="cards">
               ${this.state.pendingCardChoices.map((card, index) => `
                 <button class="card ${card.rarity} ${statThemeClass(cardCategories(card))}" ${statThemeStyle(cardCategories(card))} data-card="${index}">
-                  <strong>${escapeHtml(card.name)}</strong>
-                  <span>${escapeHtml(card.description)}</span>
+                  ${renderCardSummary(card)}
                 </button>
               `).join('')}
             </div>
@@ -477,8 +477,7 @@ export class GameApp {
             ${cards.map((card) => `
               <article class="card-library-card ${card.rarity} ${statThemeClass(card.affectedCategories)}" ${statThemeStyle(card.affectedCategories)}>
                 <div>
-                  <strong>${escapeHtml(card.name)}</strong>
-                  <span>${escapeHtml(card.description)}</span>
+                  ${renderCardPoolSummary(card)}
                 </div>
                 <small>${card.source === 'base' ? 'Base' : 'Meta'}</small>
               </article>
@@ -504,7 +503,8 @@ export class GameApp {
     return `
       <div class="preview-grid">
         <div>
-          ${renderDiceGrid(after, { compareTo: this.state })}
+          ${renderDiceGrid(after, { compareTo: this.state, showRunEffects: false, previewCard: card })}
+          ${card ? renderRollOnlyCardSummary(card) : ''}
         </div>
       </div>
     `;
@@ -534,12 +534,11 @@ export class GameApp {
 
     return `
       <div class="meta-preview-summary">
-        <h3>${node ? escapeHtml(node.label) : 'Select an upgrade'}</h3>
+        ${node ? renderMetaNodeSummary(node) : '<h3>Select an upgrade</h3>'}
         <div class="meta-preview-money ${moneyChanged ? 'changed' : ''}">$${after.money}</div>
         <span>${status}</span>
       </div>
-      ${renderDiceGrid(after, { compareTo: before })}
-      ${node?.effect.type === 'unlockCard' && buyable ? `<div class="run-effects"><span>${escapeHtml(node.label)}</span></div>` : ''}
+      ${renderDiceGrid(after, { compareTo: before, showRunEffects: false })}
     `;
   }
 }
@@ -598,10 +597,30 @@ function cardBackground(categories: DiceCategory[]): string {
 }
 
 function previewCardState(state: GameState, card: CardSpec): GameState {
-  return applyCard({
+  const after = applyCard({
     ...state,
     runCards: [...state.runCards, card],
   }, card);
+
+  if (card.effect.type !== 'categoryDelta') {
+    return after;
+  }
+
+  const effect = card.effect;
+  const dice = Object.fromEntries(
+    Object.entries(after.dice).map(([category, die]) => [category, { ...die, faces: [...die.faces] }]),
+  ) as GameState['dice'];
+
+  dice[effect.category].faces = dice[effect.category].faces
+    .map((face) => face + effect.amount);
+
+  const penaltyAmount = effect.penaltyAmount;
+  if (effect.penaltyCategory && penaltyAmount !== undefined) {
+    dice[effect.penaltyCategory].faces = dice[effect.penaltyCategory].faces
+      .map((face) => face + penaltyAmount);
+  }
+
+  return { ...after, dice };
 }
 
 function metaPreviewState(boughtMetaNodes: MetaNodeId[]): Pick<GameState, 'dice' | 'runCards' | 'autoRerollLowest' | 'temporaryAutoRerollLowest'> & { money: number } {

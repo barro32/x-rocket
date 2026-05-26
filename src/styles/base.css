@@ -173,6 +173,7 @@ h2 {
 .die {
   align-items: center;
   display: flex;
+  gap: 6px;
 }
 
 .die-faces {
@@ -183,10 +184,10 @@ h2 {
 
 .die-face {
   align-items: center;
-  background: color-mix(in srgb, var(--stat-color, #d8f3dc) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stat-color, #d8f3dc) 34%, transparent);
+  background: rgba(216, 226, 240, 0.08);
+  border: 1px solid rgba(160, 181, 210, 0.24);
   border-radius: 4px;
-  color: color-mix(in srgb, var(--stat-color, #d8f3dc) 75%, #ffffff);
+  color: #edf5ff;
   display: inline-flex;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -197,9 +198,49 @@ h2 {
 }
 
 .die-face.changed {
-  background: rgba(255, 200, 87, 0.18);
-  border-color: #ffc857;
-  color: #ffe4a6;
+  font-weight: 800;
+}
+
+.die-face.changed.positive {
+  background: rgba(142, 246, 197, 0.18);
+  border-color: #8ef6c5;
+  color: #8ef6c5;
+}
+
+.die-face.changed.negative {
+  background: rgba(255, 90, 95, 0.18);
+  border-color: #ff5a5f;
+  color: #ffb4b7;
+}
+
+.die-modifiers {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 44px;
+}
+
+.die-modifiers.empty {
+  display: inline-flex;
+}
+
+.die-modifiers span {
+  background: rgba(160, 181, 210, 0.14);
+  border: 1px solid rgba(160, 181, 210, 0.34);
+  border-radius: 999px;
+  color: #edf5ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.die-modifiers span.preview {
+  background: rgba(142, 246, 197, 0.16);
+  border-color: rgba(142, 246, 197, 0.48);
+  color: #8ef6c5;
 }
 
 .run-effects {
@@ -226,6 +267,91 @@ h2 {
 
 .run-effects span.temporary {
   border-style: dashed;
+}
+
+.effect-rows {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.effect-row {
+  align-items: center;
+  background: rgba(5, 9, 16, 0.28);
+  border: 1px solid rgba(160, 181, 210, 0.18);
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(66px, 0.9fr) minmax(76px, 1.1fr) auto;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.effect-row.stat-themed {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--stat-color) 14%, rgba(5, 9, 16, 0.28)), rgba(5, 9, 16, 0.24));
+  border-color: color-mix(in srgb, var(--stat-color) 35%, rgba(160, 181, 210, 0.18));
+}
+
+.effect-dice {
+  color: color-mix(in srgb, var(--stat-color, #c8d6e8) 70%, #ffffff);
+  font-weight: 800;
+  min-width: 0;
+}
+
+.effect-target,
+.effect-note {
+  color: #c8d6e8;
+  min-width: 0;
+}
+
+.effect-value {
+  background: rgba(160, 181, 210, 0.14);
+  border: 1px solid rgba(160, 181, 210, 0.32);
+  border-radius: 999px;
+  color: #edf5ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.effect-value.positive {
+  background: rgba(142, 246, 197, 0.16);
+  border-color: rgba(142, 246, 197, 0.48);
+  color: #8ef6c5;
+}
+
+.effect-value.negative {
+  background: rgba(255, 90, 95, 0.16);
+  border-color: rgba(255, 90, 95, 0.48);
+  color: #ffb4b7;
+}
+
+.effect-value.multiplier {
+  background: rgba(160, 181, 210, 0.14);
+  border-color: rgba(160, 181, 210, 0.36);
+  color: #edf5ff;
+}
+
+.effect-note {
+  grid-column: 1 / -1;
+  font-size: 11px;
+}
+
+.effect-rows.compact {
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.effect-rows.compact .effect-row {
+  font-size: 11px;
+  gap: 5px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.05fr) auto;
+  padding: 6px 7px;
+}
+
+.effect-rows.compact .effect-value {
+  padding: 2px 5px;
 }
 
 .launch-result {
@@ -449,12 +575,6 @@ td.zero {
   margin: 6px 0;
 }
 
-.card-library-card span {
-  color: #c8d6e8;
-  display: block;
-  font-size: 13px;
-}
-
 .card-library-card small {
   border: 1px solid rgba(160, 181, 210, 0.24);
   border-radius: 999px;
@@ -494,7 +614,8 @@ td.zero {
   display: flex;
   flex-direction: column;
   min-height: 170px;
-  padding: 14px;
+  min-width: 0;
+  padding: 10px;
   text-align: left;
 }
 
@@ -510,6 +631,20 @@ td.zero {
 .card strong {
   font-size: 18px;
   margin: 8px 0;
+}
+
+.card .effect-row,
+.card-library-card .effect-row {
+  min-width: 0;
+}
+
+.card .effect-dice,
+.card .effect-target,
+.card-library-card .effect-dice,
+.card-library-card .effect-target {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card.uncommon {
@@ -554,7 +689,7 @@ td.zero {
 }
 
 .preview-grid .die {
-  grid-template-columns: 21px 1fr;
+  grid-template-columns: 1fr;
 }
 
 .preview-grid .die-face {

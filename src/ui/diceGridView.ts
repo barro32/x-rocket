@@ -1,11 +1,14 @@
 import { categoryColors, categoryLabels, diceCategories } from '../sim/categories';
 import type { CardSpec, DiceCategory, GameState } from '../sim/types';
+import { cardEffectRows, renderEffectRows } from './effectRowsView';
 import { escapeHtml } from './metaGridView';
 
 type DiceGridState = Pick<GameState, 'dice' | 'runCards' | 'autoRerollLowest' | 'temporaryAutoRerollLowest'>;
 
 interface DiceGridOptions {
   compareTo?: DiceGridState;
+  showRunEffects?: boolean;
+  previewCard?: CardSpec;
 }
 
 export function renderDiceGrid(state: DiceGridState, options: DiceGridOptions = {}): string {
@@ -17,93 +20,133 @@ export function renderDiceGrid(state: DiceGridState, options: DiceGridOptions = 
           <div class="dice-row stat-themed" style="--stat-color: ${categoryColors[category]}">
             <span>${escapeHtml(categoryLabels[category])}</span>
             <div class="dice-list">
-              ${renderDie(category, die.faces, options.compareTo)}
+              ${renderDie(category, die.faces, options.compareTo, modifierValues(category, state, options.previewCard))}
             </div>
           </div>
         `;
       }).join('')}
     </div>
-    ${renderRunEffects(state, options.compareTo)}
+    ${options.showRunEffects === false ? '' : renderRunEffects(state, options.compareTo)}
   `;
 }
 
-function renderDie(category: DiceCategory, faces: number[], compareTo?: DiceGridState): string {
+function renderDie(category: DiceCategory, faces: number[], compareTo: DiceGridState | undefined, modifiers: DieModifier[]): string {
   const compareDie = compareTo?.dice[category];
+  const modifierColumn = renderModifierColumn(modifiers);
+
+  if (compareDie && faces.some((face, faceIndex) => compareDie.faces[faceIndex] !== face)) {
+    return `
+      <div class="die">
+        <span class="die-faces">
+          ${faces.map((face, faceIndex) => {
+            const beforeFace = compareDie.faces[faceIndex];
+            const changed = beforeFace !== face;
+            const direction = face > beforeFace ? 'positive' : 'negative';
+            return `<span class="die-face ${changed ? `changed ${direction}` : ''}">${face}</span>`;
+          }).join('')}
+        </span>
+        ${modifierColumn}
+      </div>
+    `;
+  }
 
   return `
     <div class="die">
       <span class="die-faces">
-        ${faces.map((face, faceIndex) => {
-          const beforeFace = compareDie?.faces[faceIndex];
-          const changed = beforeFace !== undefined && beforeFace !== face;
-          return `<span class="die-face ${changed ? 'changed' : ''}">${face}</span>`;
-        }).join('')}
+        ${faces.map((face) => `<span class="die-face">${face}</span>`).join('')}
       </span>
+      ${modifierColumn}
     </div>
+  `;
+}
+
+function renderModifierColumn(modifiers: DieModifier[]): string {
+  if (modifiers.length === 0) {
+    return '<span class="die-modifiers empty"></span>';
+  }
+
+  return `
+    <span class="die-modifiers">
+      ${modifiers.map((modifier) => `<span class="${modifier.preview ? 'preview' : ''}">${escapeHtml(modifier.value)}</span>`).join('')}
+    </span>
   `;
 }
 
 function renderRunEffects(
   state: Pick<GameState, 'runCards' | 'autoRerollLowest' | 'temporaryAutoRerollLowest'>,
-  compareTo?: Pick<GameState, 'runCards' | 'autoRerollLowest' | 'temporaryAutoRerollLowest'>,
+  _compareTo?: Pick<GameState, 'runCards' | 'autoRerollLowest' | 'temporaryAutoRerollLowest'>,
 ): string {
-  const effects = [
-    ...(state.autoRerollLowest > 0 ? [{ label: `Auto lowest reroll x${state.autoRerollLowest}`, temporary: false }] : []),
-    ...(state.temporaryAutoRerollLowest > 0 ? [{ label: `Reroll lowest x${state.temporaryAutoRerollLowest}`, temporary: true }] : []),
-    ...state.runCards.flatMap((card) => rollEffectLabel(card).map((label) => ({ label, temporary: false }))),
+  const rows = [
+    ...state.autoRerollLowest > 0
+      ? [{ dice: 'Any', target: 'Lowest roll', value: `+${state.autoRerollLowest} ${state.autoRerollLowest === 1 ? 'reroll' : 'rerolls'}` }]
+      : [],
+    ...state.temporaryAutoRerollLowest > 0
+      ? [{ dice: 'Any', target: 'Lowest roll', value: `+${state.temporaryAutoRerollLowest} temporary ${state.temporaryAutoRerollLowest === 1 ? 'reroll' : 'rerolls'}` }]
+      : [],
+    ...state.runCards.flatMap(rollEffectRows),
   ];
-  const previousEffects = compareTo ? [
-    ...(compareTo.autoRerollLowest > 0 ? [`Auto lowest reroll x${compareTo.autoRerollLowest}`] : []),
-    ...(compareTo.temporaryAutoRerollLowest > 0 ? [`Reroll lowest x${compareTo.temporaryAutoRerollLowest}`] : []),
-    ...compareTo.runCards.flatMap((card) => rollEffectLabel(card)),
-  ] : [];
-  const previousCounts = effectCounts(previousEffects);
 
-  if (effects.length === 0) {
+  if (rows.length === 0) {
     return '<div class="run-effects"><span>-</span></div>';
   }
 
-  return `
-    <div class="run-effects">
-      ${effects.map((effect) => {
-        const previousCount = previousCounts.get(effect.label) ?? 0;
-        const changed = previousCount === 0;
-        if (previousCount > 0) {
-          previousCounts.set(effect.label, previousCount - 1);
-        }
-        return `<span class="${changed ? 'changed' : ''} ${effect.temporary ? 'temporary' : ''}">${escapeHtml(effect.label)}</span>`;
-      }).join('')}
-    </div>
-  `;
+  return renderEffectRows(rows, { compact: true });
 }
 
-function effectCounts(effects: string[]): Map<string, number> {
-  return effects.reduce((counts, effect) => {
-    counts.set(effect, (counts.get(effect) ?? 0) + 1);
-    return counts;
-  }, new Map<string, number>());
+function rollEffectRows(card: CardSpec) {
+  return cardEffectRows(card.effect).filter((row) => {
+    switch (card.effect.type) {
+      case 'doubleHighestRoll':
+      case 'categoryDelta':
+      case 'topBottomDelta':
+      case 'multiplyStat':
+        return true;
+      case 'addFaceValue':
+      case 'addRandomFaceValue':
+      case 'addFaceValueToCategories':
+      case 'addAllFaces':
+      case 'autoRerollLowest':
+        return false;
+    }
+  });
 }
 
-function rollEffectLabel(card: CardSpec): string[] {
+interface DieModifier {
+  value: string;
+  preview: boolean;
+}
+
+function modifierValues(category: DiceCategory, state: DiceGridState, previewCard?: CardSpec): DieModifier[] {
+  const existing = state.runCards.flatMap((card) => cardModifierValues(category, card, false));
+  const preview = previewCard && !state.runCards.some((card) => card.id === previewCard.id)
+    ? cardModifierValues(category, previewCard, true)
+    : [];
+  return [...existing, ...preview];
+}
+
+function cardModifierValues(category: DiceCategory, card: CardSpec, preview: boolean): DieModifier[] {
   switch (card.effect.type) {
-    case 'doubleHighestRoll':
-      return ['2x highest roll'];
+    case 'multiplyStat':
+      return card.effect.category === category ? [{ value: `x${card.effect.multiplier}`, preview }] : [];
     case 'categoryDelta':
       return [
-        `${card.effect.amount >= 0 ? '+' : ''}${card.effect.amount} ${categoryLabels[card.effect.category]} roll`,
-        ...card.effect.penaltyCategory && card.effect.penaltyAmount
-          ? [`${card.effect.penaltyAmount >= 0 ? '+' : ''}${card.effect.penaltyAmount} ${categoryLabels[card.effect.penaltyCategory]} roll`]
+        ...card.effect.category === category ? [{ value: `${signed(card.effect.amount)} all`, preview }] : [],
+        ...card.effect.penaltyCategory === category && card.effect.penaltyAmount !== undefined
+          ? [{ value: `${signed(card.effect.penaltyAmount)} all`, preview }]
           : [],
       ];
-    case 'topBottomDelta':
-      return [`+${card.effect.topAmount} highest roll`, `${card.effect.bottomAmount} lowest roll`];
-    case 'multiplyStat':
-      return [`x${card.effect.multiplier} ${categoryLabels[card.effect.category]} roll`];
+    case 'addAllFaces':
+      return card.effect.category === category ? [{ value: `${signed(card.effect.amount)} all`, preview }] : [];
     case 'addFaceValue':
     case 'addRandomFaceValue':
     case 'addFaceValueToCategories':
-    case 'addAllFaces':
     case 'autoRerollLowest':
+    case 'doubleHighestRoll':
+    case 'topBottomDelta':
       return [];
   }
+}
+
+function signed(amount: number): string {
+  return `${amount >= 0 ? '+' : ''}${amount}`;
 }

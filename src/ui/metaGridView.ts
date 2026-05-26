@@ -1,5 +1,5 @@
 import { canBuyMetaNode, isMetaNodeUnlocked, positionedMetaNodes } from '../sim/meta';
-import { categoryColors, diceCategories } from '../sim/categories';
+import { categoryColors, categoryLabels, diceCategories } from '../sim/categories';
 import type { DiceCategory, GameState, MetaNodeEffect } from '../sim/types';
 
 export function renderMetaGrid(state: GameState): string {
@@ -58,13 +58,30 @@ export function renderMetaGrid(state: GameState): string {
               aria-disabled="${buyable ? 'false' : 'true'}"
             >
               <polygon points="${points}" />
-              <text class="hex-label">${escapeHtml(node.label)}</text>
+              <text class="hex-label">${escapeHtml(compactMetaLabel(node.effect))}</text>
             </g>
           `;
         }).join('')}
       </svg>
     </div>
   `;
+}
+
+function compactMetaLabel(effect: MetaNodeEffect): string {
+  switch (effect.type) {
+    case 'startingMoney':
+      return '+$5 Start';
+    case 'addFaceValue':
+      return `+${effect.amount} ${categoryLabels[effect.category]}`;
+    case 'addWeakestFace':
+      return `+${effect.amount} Weakest`;
+    case 'autoRerollLowest':
+      return 'Reroll Low';
+    case 'upgradeRandomFaceCard':
+      return `Better ${categoryLabels[effect.category]}`;
+    case 'unlockCard':
+      return 'Unlock Card';
+  }
 }
 
 function categoryForMetaEffect(effect: MetaNodeEffect): DiceCategory | undefined {
