@@ -1,7 +1,7 @@
+import type { ReactNode } from 'react';
 import { categoryColors, categoryLabels } from '../sim/categories';
 import type { CardPoolEntry } from '../sim/cards';
 import type { CardEffect, CardSpec, DiceCategory, MetaNodeEffect, MetaNodeSpec } from '../sim/types';
-import { escapeHtml } from './metaGridView';
 
 interface EffectRow {
   dice: string;
@@ -11,50 +11,50 @@ interface EffectRow {
   note?: string;
 }
 
-export function renderCardSummary(card: CardSpec): string {
-  return `
-    ${renderEffectRows(cardEffectRows(card.effect), { compact: true })}
-  `;
+export function CardSummary({ card }: { card: CardSpec }): ReactNode {
+  return <EffectRows rows={cardEffectRows(card.effect)} compact />;
 }
 
-export function renderRollOnlyCardSummary(card: CardSpec): string {
+export function CardPoolSummary({ card }: { card: CardPoolEntry }): ReactNode {
+  return (
+    <>
+      <strong>{cardPoolTitle(card)}</strong>
+      <EffectRows rows={cardPoolEffectRows(card)} compact />
+    </>
+  );
+}
+
+export function MetaNodeSummary({ node }: { node: MetaNodeSpec }): ReactNode {
+  return (
+    <>
+      <h3>{metaNodeTitle(node)}</h3>
+      <EffectRows rows={metaEffectRows(node.effect)} />
+    </>
+  );
+}
+
+export function RollOnlyCardSummary({ card }: { card: CardSpec }): ReactNode {
   const rows = rollOnlyRows(card.effect);
-  return rows.length > 0 ? renderEffectRows(rows, { compact: true }) : '';
+  return rows.length > 0 ? <EffectRows rows={rows} compact /> : null;
 }
 
-export function renderCardPoolSummary(card: CardPoolEntry): string {
-  return `
-    <strong>${escapeHtml(cardPoolTitle(card))}</strong>
-    ${renderEffectRows(cardPoolEffectRows(card), { compact: true })}
-  `;
-}
-
-export function renderMetaNodeSummary(node: MetaNodeSpec): string {
-  return `
-    <h3>${escapeHtml(metaNodeTitle(node))}</h3>
-    ${renderEffectRows(metaEffectRows(node.effect))}
-  `;
-}
-
-export function cardTitle(card: CardSpec): string {
-  switch (card.effect.type) {
-    case 'addFaceValue':
-    case 'addRandomFaceValue':
-    case 'addAllFaces':
-      return `${signed(card.effect.amount)} ${categoryLabels[card.effect.category]}`;
-    case 'addFaceValueToCategories':
-      return `${signed(card.effect.amount)} ${sideName(card.effect.faceIndex)} Dice`;
-    case 'multiplyStat':
-      return `x${card.effect.multiplier} ${categoryLabels[card.effect.category]}`;
-    case 'autoRerollLowest':
-      return 'Reroll Lowest';
-    case 'doubleHighestRoll':
-      return 'x2 Highest Roll';
-    case 'categoryDelta':
-      return `${signed(card.effect.amount)} ${categoryLabels[card.effect.category]}`;
-    case 'topBottomDelta':
-      return `${signed(card.effect.topAmount)} Highest Roll`;
-  }
+export function EffectRows({ rows, compact = false }: { rows: EffectRow[]; compact?: boolean }): ReactNode {
+  return (
+    <div className={`effect-rows ${compact ? 'compact' : ''}`}>
+      {rows.map((row, index) => (
+        <div
+          className={`effect-row ${row.category ? 'stat-themed' : ''}`}
+          key={`${row.dice}-${row.target}-${row.value}-${index}`}
+          style={row.category ? ({ '--stat-color': categoryColors[row.category] } as React.CSSProperties) : undefined}
+        >
+          <span className="effect-dice">{row.dice}</span>
+          <span className="effect-target">{row.target}</span>
+          <span className={`effect-value ${effectValueClass(row.value)}`}>{row.value}</span>
+          {row.note ? <span className="effect-note">{row.note}</span> : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function metaNodeTitle(node: MetaNodeSpec): string {
@@ -139,6 +139,23 @@ export function cardEffectRows(effect: CardEffect): EffectRow[] {
   }
 }
 
+function metaEffectRows(effect: MetaNodeEffect): EffectRow[] {
+  switch (effect.type) {
+    case 'startingMoney':
+      return [{ dice: 'Run', target: 'Starting money', value: '$10' }];
+    case 'addFaceValue':
+      return [categoryRow(effect.category, sideName(effect.faceIndex), signed(effect.amount))];
+    case 'addWeakestFace':
+      return [{ dice: 'Any', target: 'First empty side', value: signed(effect.amount) }];
+    case 'autoRerollLowest':
+      return [{ dice: 'Any', target: 'Lowest roll', value: rerollValue(effect.amount) }];
+    case 'upgradeRandomFaceCard':
+      return [categoryRow(effect.category, 'Future side cards', `${effect.amount} sides`)];
+    case 'unlockCard':
+      return unlockCardRows(effect.cardId).map((row) => ({ ...row, note: 'Unlocked card' }));
+  }
+}
+
 function rollOnlyRows(effect: CardEffect): EffectRow[] {
   switch (effect.type) {
     case 'autoRerollLowest':
@@ -158,57 +175,6 @@ function rollOnlyRows(effect: CardEffect): EffectRow[] {
     case 'categoryDelta':
       return [];
   }
-}
-
-export function metaEffectRows(effect: MetaNodeEffect): EffectRow[] {
-  switch (effect.type) {
-    case 'startingMoney':
-      return [{ dice: 'Run', target: 'Starting money', value: '$10' }];
-    case 'addFaceValue':
-      return [categoryRow(effect.category, sideName(effect.faceIndex), signed(effect.amount))];
-    case 'addWeakestFace':
-      return [{ dice: 'Any', target: 'First empty side', value: signed(effect.amount) }];
-    case 'autoRerollLowest':
-      return [{ dice: 'Any', target: 'Lowest roll', value: rerollValue(effect.amount) }];
-    case 'upgradeRandomFaceCard':
-      return [categoryRow(effect.category, 'Future side cards', `${effect.amount} sides`)];
-    case 'unlockCard':
-      return unlockCardRows(effect.cardId).map((row) => ({
-        ...row,
-        note: 'Unlocked card',
-      }));
-  }
-}
-
-export function renderEffectRows(rows: EffectRow[], options: { compact?: boolean } = {}): string {
-  return `
-    <div class="effect-rows ${options.compact ? 'compact' : ''}">
-      ${rows.map((row) => `
-        <div class="effect-row ${row.category ? 'stat-themed' : ''}" ${row.category ? `style="--stat-color: ${categoryColors[row.category]}"` : ''}>
-          <span class="effect-dice">${escapeHtml(row.dice)}</span>
-          <span class="effect-target">${escapeHtml(row.target)}</span>
-          <span class="effect-value ${effectValueClass(row.value)}">${escapeHtml(row.value)}</span>
-          ${row.note ? `<span class="effect-note">${escapeHtml(row.note)}</span>` : ''}
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function effectValueClass(value: string): string {
-  if (value.startsWith('x')) {
-    return 'multiplier';
-  }
-
-  if (value.startsWith('-')) {
-    return 'negative';
-  }
-
-  if (value.startsWith('+')) {
-    return 'positive';
-  }
-
-  return '';
 }
 
 function unlockCardRows(cardId: string): EffectRow[] {
@@ -269,12 +235,7 @@ function unlockCardTitle(cardId: string): string {
 }
 
 function categoryRow(category: DiceCategory, target: string, value: string): EffectRow {
-  return {
-    dice: categoryLabels[category],
-    category,
-    target,
-    value,
-  };
+  return { dice: categoryLabels[category], category, target, value };
 }
 
 function sideName(faceIndex: number): string {
@@ -287,6 +248,22 @@ function signed(amount: number): string {
 
 function rerollValue(amount: number): string {
   return `${signed(amount)} ${amount === 1 ? 'reroll' : 'rerolls'}`;
+}
+
+function effectValueClass(value: string): string {
+  if (value.startsWith('x')) {
+    return 'multiplier';
+  }
+
+  if (value.startsWith('-')) {
+    return 'negative';
+  }
+
+  if (value.startsWith('+')) {
+    return 'positive';
+  }
+
+  return '';
 }
 
 function matchCategoryCard(cardId: string, prefix: string): DiceCategory | undefined {

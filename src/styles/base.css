@@ -41,9 +41,7 @@ button:disabled {
   position: fixed;
 }
 
-.game-ui button,
-.game-ui [data-card],
-.game-ui [data-meta] {
+.game-ui button {
   pointer-events: auto;
 }
 
@@ -243,6 +241,18 @@ h2 {
   color: #8ef6c5;
 }
 
+.die-modifiers span.negative {
+  background: rgba(255, 90, 95, 0.16);
+  border-color: rgba(255, 90, 95, 0.48);
+  color: #ffb4b7;
+}
+
+.die-modifiers span.multiplier {
+  background: rgba(142, 246, 197, 0.16);
+  border-color: rgba(142, 246, 197, 0.48);
+  color: #8ef6c5;
+}
+
 .run-effects {
   border-top: 1px solid rgba(160, 181, 210, 0.16);
   display: flex;
@@ -328,9 +338,9 @@ h2 {
 }
 
 .effect-value.multiplier {
-  background: rgba(160, 181, 210, 0.14);
-  border-color: rgba(160, 181, 210, 0.36);
-  color: #edf5ff;
+  background: rgba(142, 246, 197, 0.16);
+  border-color: rgba(142, 246, 197, 0.48);
+  color: #8ef6c5;
 }
 
 .effect-note {
