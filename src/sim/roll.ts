@@ -1,6 +1,6 @@
 import { diceCategories } from './categories';
-import { pickOne, type Rng } from './rng';
-import type { CardSpec, CategoryDie, DiceCategory, DieRoll, LaunchRoll } from './types';
+import type { Rng } from './rng';
+import type { CardSpec, CategoryDie, DiceCategory, DieRoll, LaunchRoll, RollEvent } from './types';
 
 export function rollDice(
   dice: Record<DiceCategory, CategoryDie>,
@@ -8,14 +8,17 @@ export function rollDice(
   autoRerollLowest: number,
   runCards: CardSpec[],
 ): LaunchRoll {
+  const events: RollEvent[] = [];
   const rolls: DieRoll[] = diceCategories.map((category) => {
     const die = dice[category];
-    const value = pickOne(die.faces, rng);
+    const rolledFace = pickFace(die.faces, rng);
+    events.push({ type: 'initialRoll', category, value: rolledFace.value, faceIndex: rolledFace.faceIndex });
     return {
       dieId: die.id,
       category,
-      initialValue: value,
-      value,
+      initialValue: rolledFace.value,
+      initialFaceIndex: rolledFace.faceIndex,
+      value: rolledFace.value,
       faces: [...die.faces],
       modifiers: [],
     };
@@ -24,44 +27,46 @@ export function rollDice(
   for (let i = 0; i < autoRerollLowest; i += 1) {
     const lowestIndex = lowestRollIndex(rolls);
     const roll = rolls[lowestIndex];
-    const rerollValue = pickOne(roll.faces, rng);
+    const reroll = pickFace(roll.faces, rng);
+    events.push({ type: 'reroll', category: roll.category, before: roll.value, after: reroll.value, faceIndex: reroll.faceIndex });
     rolls[lowestIndex] = {
       ...roll,
-      value: rerollValue,
+      value: reroll.value,
       rerolledFrom: roll.value,
+      rerolledFaceIndex: reroll.faceIndex,
       modifiers: [...roll.modifiers, {
         label: 'reroll',
         before: roll.value,
-        after: rerollValue,
+        after: reroll.value,
       }],
     };
   }
 
-  applyRollCardEffects(rolls, runCards);
+  applyRollCardEffects(rolls, runCards, events);
 
   const exploded = rolls.some((roll) => roll.value === 0);
   const score = rolls.reduce((sum, roll) => sum + roll.value, 0);
-  return { rolls, score, exploded };
+  return { rolls, events, score, exploded };
 }
 
-function applyRollCardEffects(rolls: DieRoll[], runCards: CardSpec[]): void {
+function applyRollCardEffects(rolls: DieRoll[], runCards: CardSpec[], events: RollEvent[]): void {
   for (const card of runCards) {
     switch (card.effect.type) {
       case 'multiplyStat':
-        multiplyCategory(rolls, card.effect.category, card.effect.multiplier);
+        multiplyCategory(rolls, card.effect.category, card.effect.multiplier, card, events);
         break;
       case 'doubleHighestRoll':
-        adjustRoll(rolls, highestRollIndex(rolls), rolls[highestRollIndex(rolls)].value, 'x2');
+        adjustRoll(rolls, highestRollIndex(rolls), rolls[highestRollIndex(rolls)].value, 'x2', card, events);
         break;
       case 'categoryDelta':
-        adjustCategory(rolls, card.effect.category, card.effect.amount, 'highest');
+        adjustCategory(rolls, card.effect.category, card.effect.amount, 'highest', card, events);
         if (card.effect.penaltyCategory && card.effect.penaltyAmount) {
-          adjustCategory(rolls, card.effect.penaltyCategory, card.effect.penaltyAmount, 'lowest');
+          adjustCategory(rolls, card.effect.penaltyCategory, card.effect.penaltyAmount, 'lowest', card, events);
         }
         break;
       case 'topBottomDelta':
-        adjustRoll(rolls, highestRollIndex(rolls), card.effect.topAmount, signedLabel(card.effect.topAmount));
-        adjustRoll(rolls, lowestRollIndex(rolls), card.effect.bottomAmount, signedLabel(card.effect.bottomAmount));
+        adjustRoll(rolls, highestRollIndex(rolls), card.effect.topAmount, signedLabel(card.effect.topAmount), card, events);
+        adjustRoll(rolls, lowestRollIndex(rolls), card.effect.bottomAmount, signedLabel(card.effect.bottomAmount), card, events);
         break;
       case 'addFaceValue':
       case 'addRandomFaceValue':
@@ -73,11 +78,12 @@ function applyRollCardEffects(rolls: DieRoll[], runCards: CardSpec[]): void {
   }
 }
 
-function multiplyCategory(rolls: DieRoll[], category: DiceCategory, multiplier: number): void {
+function multiplyCategory(rolls: DieRoll[], category: DiceCategory, multiplier: number, card: CardSpec, events: RollEvent[]): void {
   for (let index = 0; index < rolls.length; index += 1) {
     if (rolls[index].category === category) {
       const before = rolls[index].value;
       const after = before * multiplier;
+      events.push({ type: 'cardModifier', cardId: card.id, cardName: card.name, label: `x${multiplier}`, category, before, after });
       rolls[index] = {
         ...rolls[index],
         value: after,
@@ -87,7 +93,14 @@ function multiplyCategory(rolls: DieRoll[], category: DiceCategory, multiplier: 
   }
 }
 
-function adjustCategory(rolls: DieRoll[], category: DiceCategory, amount: number, target: 'highest' | 'lowest'): void {
+function adjustCategory(
+  rolls: DieRoll[],
+  category: DiceCategory,
+  amount: number,
+  target: 'highest' | 'lowest',
+  card: CardSpec,
+  events: RollEvent[],
+): void {
   const indices = rolls.flatMap((roll, index) => roll.category === category ? [index] : []);
   if (indices.length === 0) {
     return;
@@ -98,7 +111,7 @@ function adjustCategory(rolls: DieRoll[], category: DiceCategory, amount: number
     }
     return rolls[index].value < rolls[best].value ? index : best;
   }, indices[0]);
-  adjustRoll(rolls, selected, amount, signedLabel(amount));
+  adjustRoll(rolls, selected, amount, signedLabel(amount), card, events);
 }
 
 function highestRollIndex(rolls: DieRoll[]): number {
@@ -109,9 +122,10 @@ function lowestRollIndex(rolls: DieRoll[]): number {
   return rolls.reduce((lowest, roll, index) => roll.value < rolls[lowest].value ? index : lowest, 0);
 }
 
-function adjustRoll(rolls: DieRoll[], index: number, amount: number, label: string): void {
+function adjustRoll(rolls: DieRoll[], index: number, amount: number, label: string, card: CardSpec, events: RollEvent[]): void {
   const before = rolls[index].value;
   const after = Math.max(0, before + amount);
+  events.push({ type: 'cardModifier', cardId: card.id, cardName: card.name, label, category: rolls[index].category, before, after });
   rolls[index] = {
     ...rolls[index],
     value: after,
@@ -121,4 +135,9 @@ function adjustRoll(rolls: DieRoll[], index: number, amount: number, label: stri
 
 function signedLabel(amount: number): string {
   return `${amount >= 0 ? '+' : ''}${amount}`;
+}
+
+function pickFace(faces: number[], rng: Rng): { value: number; faceIndex: number } {
+  const faceIndex = Math.min(faces.length - 1, Math.floor(rng.next() * faces.length));
+  return { value: faces[faceIndex], faceIndex };
 }

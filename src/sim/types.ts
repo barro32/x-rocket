@@ -14,9 +14,11 @@ export interface DieRoll {
   dieId: string;
   category: DiceCategory;
   initialValue: number;
+  initialFaceIndex: number;
   value: number;
   faces: number[];
   rerolledFrom?: number;
+  rerolledFaceIndex?: number;
   modifiers: RollModifier[];
 }
 
@@ -28,9 +30,15 @@ export interface RollModifier {
 
 export interface LaunchRoll {
   rolls: DieRoll[];
+  events: RollEvent[];
   score: number;
   exploded: boolean;
 }
+
+export type RollEvent =
+  | { type: 'initialRoll'; category: DiceCategory; value: number; faceIndex: number }
+  | { type: 'reroll'; category: DiceCategory; before: number; after: number; faceIndex: number }
+  | { type: 'cardModifier'; cardId: string; cardName: string; label: string; category: DiceCategory; before: number; after: number };
 
 export type CardEffect =
   | { type: 'addFaceValue'; category: DiceCategory; faceIndex: number; amount: number }
@@ -48,6 +56,7 @@ export interface CardSpec {
   name: string;
   rarity: CardRarity;
   description: string;
+  affectedCategories?: DiceCategory[];
   effect: CardEffect;
 }
 

@@ -60,6 +60,23 @@ describe('card drafting', () => {
     });
   });
 
+  it('drafts uncommon S5 triple stat cards', () => {
+    const cards = draftCards(new SequenceRng([0.8, 0, 0.1, 0]), 1);
+
+    expect(cards[0]).toMatchObject({
+      id: 'uncommon-s5-thrusters-aerodynamics-weight',
+      name: '+1 S5 T/A/W',
+      rarity: 'uncommon',
+      affectedCategories: ['thrusters', 'aerodynamics', 'weight'],
+      effect: {
+        type: 'addFaceValueToCategories',
+        categories: ['thrusters', 'aerodynamics', 'weight'],
+        faceIndex: 4,
+        amount: 1,
+      },
+    });
+  });
+
   it('keeps fallback random side cards on valid stat categories', () => {
     const cards = draftCards(new SequenceRng(Array(200).fill(0.1)), 8);
 
@@ -89,6 +106,13 @@ describe('card drafting', () => {
         id: 's6-three-stats',
         description: '+1 side 6 on 3 predetermined random stats',
         source: 'meta',
+      }),
+      expect.objectContaining({
+        id: 'base-s5-fuel-guidance-weight',
+        name: '+1 S5 F/G/W',
+        rarity: 'uncommon',
+        affectedCategories: ['fuel', 'guidance', 'weight'],
+        source: 'base',
       }),
     ]));
   });

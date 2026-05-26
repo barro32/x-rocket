@@ -107,9 +107,25 @@ function normalizeLaunchResult(result: LaunchResult | undefined): LaunchResult |
     ...result,
     roll: {
       ...result.roll,
+      events: result.roll.events ?? result.roll.rolls.flatMap((roll) => [
+        { type: 'initialRoll' as const, category: roll.category, value: roll.initialValue ?? roll.rerolledFrom ?? roll.value, faceIndex: roll.initialFaceIndex ?? 0 },
+        ...roll.modifiers.map((modifier) => modifier.label === 'reroll'
+          ? { type: 'reroll' as const, category: roll.category, before: modifier.before, after: modifier.after, faceIndex: roll.rerolledFaceIndex ?? 0 }
+          : {
+              type: 'cardModifier' as const,
+              cardId: 'saved-card',
+              cardName: modifier.label,
+              label: modifier.label,
+              category: roll.category,
+              before: modifier.before,
+              after: modifier.after,
+            }),
+      ]),
       rolls: result.roll.rolls.map((roll) => ({
         ...roll,
         initialValue: roll.initialValue ?? roll.rerolledFrom ?? roll.value,
+        initialFaceIndex: roll.initialFaceIndex ?? 0,
+        rerolledFaceIndex: roll.rerolledFaceIndex,
         modifiers: roll.modifiers ?? (roll.rerolledFrom === undefined
           ? []
           : [{ label: 'reroll', before: roll.rerolledFrom, after: roll.value }]),

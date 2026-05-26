@@ -70,6 +70,33 @@ describe('roll resolution', () => {
     expect(roll.score).toBe(6);
   });
 
+  it('emits roll events for animation sequencing', () => {
+    const card: CardSpec = {
+      id: 'rare-die-thrusters',
+      name: 'x2 Thrusters',
+      rarity: 'rare',
+      description: 'x2 Thrusters roll',
+      effect: { type: 'multiplyStat', category: 'thrusters', multiplier: 2 },
+    };
+    const roll = rollDice(startingDice([]), new SequenceRng([0.2, 0.2, 0.2, 0.2, 0.2]), 0, [card]);
+
+    expect(roll.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'initialRoll', category: 'thrusters', value: 1, faceIndex: 1 }),
+      { type: 'cardModifier', cardId: 'rare-die-thrusters', cardName: 'x2 Thrusters', label: 'x2', category: 'thrusters', before: 1, after: 2 },
+    ]));
+  });
+
+  it('emits reroll events for animation sequencing', () => {
+    const roll = rollDice(
+      startingDice([]),
+      new SequenceRng([0.6, 0.2, 0.2, 0.2, 0.2, 0.2]),
+      1,
+      [],
+    );
+
+    expect(roll.events).toContainEqual({ type: 'reroll', category: 'thrusters', before: 0, after: 1, faceIndex: 1 });
+  });
+
   it('applies stat multiplication before stat penalties', () => {
     const x2Fuel: CardSpec = {
       id: 'rare-die-fuel',

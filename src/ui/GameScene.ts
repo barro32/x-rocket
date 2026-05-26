@@ -1,23 +1,24 @@
 import Phaser from 'phaser';
 import { buyMetaNode, canBuyMetaNode, metaNodeById } from '../sim/meta';
-import { claimBankruptcyReward, chooseCard, createInitialState, isBankrupt, launchCost, milestones, restartRun, simulateLaunch, startingMoneyFor, startingTemporaryAutoRerollLowest } from '../sim/game';
+import { claimBankruptcyReward, chooseCard, createInitialState, isBankrupt, launchCost, restartRun, simulateLaunch, startingMoneyFor, startingTemporaryAutoRerollLowest } from '../sim/game';
 import { applyCard, startingDice } from '../sim/dice';
 import { unlockedCardPoolFor } from '../sim/cards';
 import { clearSave, loadGame, saveGame } from '../sim/save';
-import type { CardSpec, DiceCategory, DieRoll, GameState, MetaNodeId } from '../sim/types';
-import { categoryColors, categoryLabels, diceCategories } from '../sim/categories';
+import type { CardSpec, DiceCategory, GameState, MetaNodeId } from '../sim/types';
+import { categoryColors } from '../sim/categories';
 import { renderDiceGrid } from './diceGridView';
 import { escapeHtml, renderMetaGrid } from './metaGridView';
 import { RocketView } from './RocketView';
+import { RollStage } from './RollStage';
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
   private rocket!: RocketView;
+  private rollStage!: RollStage;
   private ui!: HTMLDivElement;
   private busy = false;
   private showUnlockedCards = false;
   private rollingLaunch = false;
-  private revealedRolls = Number.POSITIVE_INFINITY;
 
   constructor() {
     super('GameScene');
@@ -27,6 +28,7 @@ export class GameScene extends Phaser.Scene {
     this.state = loadGame();
     this.rocket = new RocketView(this);
     this.rocket.createWorld();
+    this.rollStage = new RollStage(this);
     this.ui = document.createElement('div');
     this.ui.className = 'game-ui';
     document.body.append(this.ui);
@@ -45,18 +47,10 @@ export class GameScene extends Phaser.Scene {
     this.state = next;
     saveGame(this.state);
     this.rollingLaunch = true;
-    this.revealedRolls = 0;
     this.render();
-    await delay(260);
-    for (let index = 0; index < (next.lastLaunch?.roll.rolls.length ?? 0); index += 1) {
-      this.revealedRolls = index + 1;
-      this.render();
-      await delay(360);
-    }
-    await delay(220);
+    await this.rollStage.play(next.lastLaunch);
     await this.rocket.animateLaunch(next.lastLaunch);
     this.rollingLaunch = false;
-    this.revealedRolls = Number.POSITIVE_INFINITY;
     this.busy = false;
     this.render();
   }
@@ -102,7 +96,6 @@ export class GameScene extends Phaser.Scene {
       <section class="side-panel">
         <h2>Dice</h2>
         ${renderDiceGrid(this.state)}
-        ${this.renderLastLaunch()}
       </section>
 
       ${this.state.pendingCardChoices.length > 0 && !this.rollingLaunch ? this.renderCards() : ''}
@@ -196,48 +189,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private renderLastLaunch(): string {
-    const result = this.state.lastLaunch;
-    if (!result) {
-      return `
-        <div class="launch-result empty">
-          <h2>Launch Roll</h2>
-          <p>-</p>
-        </div>
-      `;
-    }
-    const visibleCount = Math.min(this.revealedRolls, result.roll.rolls.length);
-    const complete = visibleCount >= result.roll.rolls.length;
-
-    return `
-      <div class="launch-result ${this.rollingLaunch ? 'rolling' : ''}">
-        <div class="launch-result-header">
-          <h2>Launch Roll</h2>
-          <strong>${complete ? `${result.heightMeters}m` : 'Rolling'}</strong>
-        </div>
-        <div class="roll-showcase">
-          ${result.roll.rolls.map((roll, index) => {
-            const revealed = index < visibleCount;
-            return `
-              <div
-                class="roll-card stat-themed ${revealed ? 'revealed' : 'pending'} ${revealed && roll.value === 0 ? 'zero' : ''}"
-                style="--stat-color: ${categoryColors[roll.category]}"
-                title="${categoryLabels[roll.category]}"
-                aria-label="${categoryLabels[roll.category]} roll"
-              >
-                <strong>${revealed ? roll.value : '?'}</strong>
-                ${revealed ? renderRollBreakdown(roll) : '<div class="roll-breakdown"><span></span></div>'}
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <div class="milestones">
-          ${milestones.map((milestone) => `<span class="${this.state.runMilestoneClaims.includes(milestone) ? 'hit' : ''}">${milestone}m</span>`).join('')}
-        </div>
-      </div>
-    `;
-  }
-
   private renderCards(): string {
     return `
       <div class="modal-shade">
@@ -246,8 +197,7 @@ export class GameScene extends Phaser.Scene {
           <div class="card-picker-body">
             <div class="cards">
               ${this.state.pendingCardChoices.map((card, index) => `
-                <button class="card ${card.rarity} ${statThemeClass(cardCategory(card))}" ${statThemeStyle(cardCategory(card))} data-card="${index}">
-                  <em>${escapeHtml(card.rarity)}</em>
+                <button class="card ${card.rarity} ${statThemeClass(cardCategories(card))}" ${statThemeStyle(cardCategories(card))} data-card="${index}">
                   <strong>${escapeHtml(card.name)}</strong>
                   <span>${escapeHtml(card.description)}</span>
                 </button>
@@ -274,9 +224,8 @@ export class GameScene extends Phaser.Scene {
           </div>
           <div class="card-library-list">
             ${cards.map((card) => `
-              <article class="card-library-card ${card.rarity} ${statThemeClass(categoryFromId(card.id))}" ${statThemeStyle(categoryFromId(card.id))}>
+              <article class="card-library-card ${card.rarity} ${statThemeClass(card.affectedCategories)}" ${statThemeStyle(card.affectedCategories)}>
                 <div>
-                  <em>${escapeHtml(card.rarity)}</em>
                   <strong>${escapeHtml(card.name)}</strong>
                   <span>${escapeHtml(card.description)}</span>
                 </div>
@@ -345,51 +294,57 @@ export class GameScene extends Phaser.Scene {
 
 }
 
-function renderRollBreakdown(roll: DieRoll): string {
-  const steps = [
-    `roll ${roll.initialValue}`,
-    ...roll.modifiers.map((modifier) => modifier.label === 'reroll'
-      ? `reroll ${modifier.after}`
-      : modifier.label),
-  ];
+function cardCategories(card: CardSpec): DiceCategory[] {
+  if (card.affectedCategories) {
+    return card.affectedCategories;
+  }
 
-  return `
-    <div class="roll-breakdown">
-      ${steps.map((step) => `<span>${escapeHtml(step)}</span>`).join('')}
-    </div>
-  `;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function cardCategory(card: CardSpec): DiceCategory | undefined {
   switch (card.effect.type) {
     case 'addFaceValue':
     case 'addRandomFaceValue':
     case 'addAllFaces':
     case 'multiplyStat':
+      return [card.effect.category];
     case 'categoryDelta':
-      return card.effect.category;
+      return [
+        card.effect.category,
+        ...card.effect.penaltyCategory ? [card.effect.penaltyCategory] : [],
+      ];
     case 'addFaceValueToCategories':
+      return card.effect.categories;
     case 'autoRerollLowest':
     case 'doubleHighestRoll':
     case 'topBottomDelta':
-      return undefined;
+      return [];
   }
 }
 
-function categoryFromId(id: string): DiceCategory | undefined {
-  return diceCategories.find((category) => id.endsWith(`-${category}`));
+function statThemeClass(categories: DiceCategory[]): string {
+  return categories.length > 0 ? 'stat-themed' : '';
 }
 
-function statThemeClass(category?: DiceCategory): string {
-  return category ? 'stat-themed' : '';
+function statThemeStyle(categories: DiceCategory[]): string {
+  return categories.length > 0 ? `style="--card-bg: ${cardBackground(categories)}"` : '';
 }
 
-function statThemeStyle(category?: DiceCategory): string {
-  return category ? `style="--stat-color: ${categoryColors[category]}"` : '';
+function cardBackground(categories: DiceCategory[]): string {
+  const layers = categories.map((category) => {
+    const color = categoryColors[category];
+    switch (category) {
+      case 'thrusters':
+        return `linear-gradient(45deg, color-mix(in srgb, ${color} 54%, transparent) 0%, transparent 56%)`;
+      case 'fuel':
+        return `linear-gradient(315deg, color-mix(in srgb, ${color} 50%, transparent) 0%, transparent 56%)`;
+      case 'aerodynamics':
+        return `linear-gradient(135deg, color-mix(in srgb, ${color} 50%, transparent) 0%, transparent 56%)`;
+      case 'guidance':
+        return `linear-gradient(225deg, color-mix(in srgb, ${color} 50%, transparent) 0%, transparent 56%)`;
+      case 'weight':
+        return `radial-gradient(circle at center, color-mix(in srgb, ${color} 45%, transparent) 0%, transparent 58%)`;
+    }
+  });
+
+  return [...layers, '#17263d'].join(', ');
 }
 
 function previewCardState(state: GameState, card: CardSpec): GameState {

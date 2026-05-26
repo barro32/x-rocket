@@ -8,6 +8,7 @@ export interface CardPoolEntry {
   name: string;
   rarity: CardRarity;
   description: string;
+  affectedCategories: DiceCategory[];
   source: 'base' | 'meta';
 }
 
@@ -15,6 +16,13 @@ const rarityWeights: Array<{ rarity: CardRarity; weight: number }> = [
   { rarity: 'common', weight: 72 },
   { rarity: 'uncommon', weight: 23 },
   { rarity: 'rare', weight: 5 },
+];
+
+const uncommonS5Triples: DiceCategory[][] = [
+  ['thrusters', 'aerodynamics', 'weight'],
+  ['thrusters', 'guidance', 'weight'],
+  ['fuel', 'aerodynamics', 'weight'],
+  ['fuel', 'guidance', 'weight'],
 ];
 
 export function draftCards(rng: Rng, count = 3, boughtMetaNodes: MetaNodeId[] = []): CardSpec[] {
@@ -44,6 +52,7 @@ export function draftCards(rng: Rng, count = 3, boughtMetaNodes: MetaNodeId[] = 
       name: `+${totalAmount} ${categoryLabel(category)} ${sideLabel(faceIndexes)}`,
       rarity: 'common',
       description: `+1 ${categoryLabel(category)} ${sideDescription(faceIndexes)}`,
+      affectedCategories: [category],
       effect: { type: 'addRandomFaceValue', category, faceIndexes, amount: 1 },
     };
     cards.push(card);
@@ -63,6 +72,7 @@ export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntr
         description: sideCount === 1
           ? `+1 ${categoryLabel(category)} on one predetermined random side`
           : `+1 ${categoryLabel(category)} on ${sideCount} predetermined random sides`,
+        affectedCategories: [category],
         source: 'base',
       };
     }),
@@ -71,6 +81,15 @@ export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntr
       name: `x2 ${categoryLabel(category)}`,
       rarity: 'uncommon',
       description: `x2 ${categoryLabel(category)} roll`,
+      affectedCategories: [category],
+      source: 'base',
+    })),
+    ...uncommonS5Triples.map((categories): CardPoolEntry => ({
+      id: `base-s5-${categories.join('-')}`,
+      name: `+1 S5 ${shortCategoryList(categories)}`,
+      rarity: 'uncommon',
+      description: `+1 side 5: ${categories.map(categoryLabel).join(', ')}`,
+      affectedCategories: categories,
       source: 'base',
     })),
     {
@@ -78,6 +97,7 @@ export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntr
       name: '+1 Auto Reroll',
       rarity: 'rare',
       description: 'Reroll lowest each launch',
+      affectedCategories: [],
       source: 'base',
     },
     ...[...unlockedCardsFor(boughtMetaNodes)]
@@ -102,6 +122,7 @@ function createCard(rng: Rng, unlockedCardIds: string[], boughtMetaNodes: MetaNo
       name: '+1 Auto Reroll',
       rarity,
       description: 'Reroll lowest each launch',
+      affectedCategories: [],
       effect: { type: 'autoRerollLowest', amount: 1 },
     };
   }
@@ -110,11 +131,16 @@ function createCard(rng: Rng, unlockedCardIds: string[], boughtMetaNodes: MetaNo
   const label = categoryLabel(category);
 
   if (rarity === 'uncommon') {
+    if (rng.next() < 0.45) {
+      return uncommonS5TripleCard(pickOne(uncommonS5Triples, rng));
+    }
+
     return {
       id: `uncommon-x2-${category}`,
       name: `x2 ${label}`,
       rarity,
       description: `x2 ${label} roll`,
+      affectedCategories: [category],
       effect: { type: 'multiplyStat', category, multiplier: 2 },
     };
   }
@@ -127,7 +153,19 @@ function createCard(rng: Rng, unlockedCardIds: string[], boughtMetaNodes: MetaNo
     rarity,
     name: `+${totalAmount} ${label} ${sideLabel(faceIndexes)}`,
     description: `+1 ${label} ${sideDescription(faceIndexes)}`,
+    affectedCategories: [category],
     effect: { type: 'addRandomFaceValue', category, faceIndexes, amount: 1 },
+  };
+}
+
+function uncommonS5TripleCard(categories: DiceCategory[]): CardSpec {
+  return {
+    id: `uncommon-s5-${categories.join('-')}`,
+    name: `+1 S5 ${shortCategoryList(categories)}`,
+    rarity: 'uncommon',
+    description: `+1 side 5: ${categories.map(categoryLabel).join(', ')}`,
+    affectedCategories: categories,
+    effect: { type: 'addFaceValueToCategories', categories, faceIndex: 4, amount: 1 },
   };
 }
 
@@ -180,13 +218,30 @@ function sideDescription(faceIndexes: number[]): string {
   return `sides ${faceIndexes.map((faceIndex) => faceIndex + 1).join(' and ')}`;
 }
 
+function shortCategoryList(categories: DiceCategory[]): string {
+  return categories.map((category) => {
+    switch (category) {
+      case 'thrusters':
+        return 'T';
+      case 'fuel':
+        return 'F';
+      case 'aerodynamics':
+        return 'A';
+      case 'guidance':
+        return 'G';
+      case 'weight':
+        return 'W';
+    }
+  }).join('/');
+}
+
 function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
   if (cardId === 'double-highest') {
-    return unlockedCard(cardId, 'rare', '2x High', '2x highest roll', { type: 'doubleHighestRoll' });
+    return unlockedCard(cardId, 'rare', '2x High', '2x highest roll', [], { type: 'doubleHighestRoll' });
   }
 
   if (cardId === 'top-bottom') {
-    return unlockedCard(cardId, 'common', '+5 High -1 Low', '+5 highest roll, -1 lowest roll', { type: 'topBottomDelta', topAmount: 5, bottomAmount: -1 });
+    return unlockedCard(cardId, 'common', '+5 High -1 Low', '+5 highest roll, -1 lowest roll', [], { type: 'topBottomDelta', topAmount: 5, bottomAmount: -1 });
   }
 
   if (cardId === 's6-three-stats') {
@@ -196,6 +251,7 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
       'rare',
       '+1 S6 x3',
       `+1 side 6: ${categories.map(categoryLabel).join(', ')}`,
+      categories,
       { type: 'addFaceValueToCategories', categories, faceIndex: 5, amount: 1 },
     );
   }
@@ -208,13 +264,14 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
       'common',
       `+3 ${categoryLabel(plus3)} -1 ${categoryLabel(penaltyCategory)}`,
       `+3 ${categoryLabel(plus3)}, -1 ${categoryLabel(penaltyCategory)}`,
+      [plus3, penaltyCategory],
       { type: 'categoryDelta', category: plus3, amount: 3, penaltyCategory, penaltyAmount: -1 },
     );
   }
 
   const plus3SideOne = matchCategoryCard(cardId, 'plus3-side1-');
   if (plus3SideOne) {
-    return unlockedCard(cardId, 'common', `+3 ${categoryLabel(plus3SideOne)} S1`, `+3 ${categoryLabel(plus3SideOne)} side 1`, {
+    return unlockedCard(cardId, 'common', `+3 ${categoryLabel(plus3SideOne)} S1`, `+3 ${categoryLabel(plus3SideOne)} side 1`, [plus3SideOne], {
       type: 'addFaceValue',
       category: plus3SideOne,
       faceIndex: 0,
@@ -224,7 +281,7 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
 
   const rareDie = matchCategoryCard(cardId, 'rare-die-');
   if (rareDie) {
-    return unlockedCard(cardId, 'rare', `x2 ${categoryLabel(rareDie)}`, `x2 ${categoryLabel(rareDie)} roll`, {
+    return unlockedCard(cardId, 'rare', `x2 ${categoryLabel(rareDie)}`, `x2 ${categoryLabel(rareDie)} roll`, [rareDie], {
       type: 'multiplyStat',
       category: rareDie,
       multiplier: 2,
@@ -233,7 +290,7 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
 
   const allFaces = matchCategoryCard(cardId, 'all-faces-');
   if (allFaces) {
-    return unlockedCard(cardId, 'rare', `+1 All ${categoryLabel(allFaces)}`, `+1 all ${categoryLabel(allFaces)} faces`, {
+    return unlockedCard(cardId, 'rare', `+1 All ${categoryLabel(allFaces)}`, `+1 all ${categoryLabel(allFaces)} faces`, [allFaces], {
       type: 'addAllFaces',
       category: allFaces,
       amount: 1,
@@ -243,21 +300,21 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
   return undefined;
 }
 
-function unlockedCard(id: string, rarity: CardRarity, name: string, description: string, effect: CardEffect): CardSpec {
-  return { id, rarity, name, description, effect };
+function unlockedCard(id: string, rarity: CardRarity, name: string, description: string, affectedCategories: DiceCategory[], effect: CardEffect): CardSpec {
+  return { id, rarity, name, description, affectedCategories, effect };
 }
 
 function cardPoolEntryFromUnlockId(cardId: string): CardPoolEntry | undefined {
   if (cardId === 'double-highest') {
-    return unlockedCardPoolEntry(cardId, 'rare', '2x High', '2x highest roll');
+    return unlockedCardPoolEntry(cardId, 'rare', '2x High', '2x highest roll', []);
   }
 
   if (cardId === 'top-bottom') {
-    return unlockedCardPoolEntry(cardId, 'common', '+5 High -1 Low', '+5 highest roll, -1 lowest roll');
+    return unlockedCardPoolEntry(cardId, 'common', '+5 High -1 Low', '+5 highest roll, -1 lowest roll', []);
   }
 
   if (cardId === 's6-three-stats') {
-    return unlockedCardPoolEntry(cardId, 'rare', '+1 S6 x3', '+1 side 6 on 3 predetermined random stats');
+    return unlockedCardPoolEntry(cardId, 'rare', '+1 S6 x3', '+1 side 6 on 3 predetermined random stats', diceCategories);
   }
 
   const plus3 = matchCategoryCard(cardId, 'plus3-minus1-');
@@ -268,29 +325,30 @@ function cardPoolEntryFromUnlockId(cardId: string): CardPoolEntry | undefined {
       'common',
       `+3 ${categoryLabel(plus3)} -1 ${categoryLabel(penaltyCategory)}`,
       `+3 ${categoryLabel(plus3)}, -1 ${categoryLabel(penaltyCategory)}`,
+      [plus3, penaltyCategory],
     );
   }
 
   const plus3SideOne = matchCategoryCard(cardId, 'plus3-side1-');
   if (plus3SideOne) {
-    return unlockedCardPoolEntry(cardId, 'common', `+3 ${categoryLabel(plus3SideOne)} S1`, `+3 ${categoryLabel(plus3SideOne)} side 1`);
+    return unlockedCardPoolEntry(cardId, 'common', `+3 ${categoryLabel(plus3SideOne)} S1`, `+3 ${categoryLabel(plus3SideOne)} side 1`, [plus3SideOne]);
   }
 
   const rareDie = matchCategoryCard(cardId, 'rare-die-');
   if (rareDie) {
-    return unlockedCardPoolEntry(cardId, 'rare', `x2 ${categoryLabel(rareDie)}`, `x2 ${categoryLabel(rareDie)} roll`);
+    return unlockedCardPoolEntry(cardId, 'rare', `x2 ${categoryLabel(rareDie)}`, `x2 ${categoryLabel(rareDie)} roll`, [rareDie]);
   }
 
   const allFaces = matchCategoryCard(cardId, 'all-faces-');
   if (allFaces) {
-    return unlockedCardPoolEntry(cardId, 'rare', `+1 All ${categoryLabel(allFaces)}`, `+1 all ${categoryLabel(allFaces)} faces`);
+    return unlockedCardPoolEntry(cardId, 'rare', `+1 All ${categoryLabel(allFaces)}`, `+1 all ${categoryLabel(allFaces)} faces`, [allFaces]);
   }
 
   return undefined;
 }
 
-function unlockedCardPoolEntry(id: string, rarity: CardRarity, name: string, description: string): CardPoolEntry {
-  return { id, rarity, name, description, source: 'meta' };
+function unlockedCardPoolEntry(id: string, rarity: CardRarity, name: string, description: string, affectedCategories: DiceCategory[]): CardPoolEntry {
+  return { id, rarity, name, description, affectedCategories, source: 'meta' };
 }
 
 function unlockedCardRarity(cardId: string): CardRarity | undefined {

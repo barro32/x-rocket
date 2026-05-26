@@ -414,20 +414,12 @@ td.zero {
 }
 
 .card-library-card.stat-themed {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--stat-color) 13%, #17263d), #17263d 62%);
-  border-color: color-mix(in srgb, var(--stat-color) 76%, #647892);
+  background: var(--card-bg);
 }
 
 .card-library-card.stat-themed strong {
-  color: color-mix(in srgb, var(--stat-color) 76%, #ffffff);
-}
-
-.card-library-card em {
-  color: #a9bdd8;
-  display: block;
-  font-size: 11px;
-  font-style: normal;
-  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
 }
 
 .card-library-card strong {
@@ -453,10 +445,12 @@ td.zero {
 
 .card-library-card.uncommon {
   border-color: #8ef6c5;
+  border-width: 2px;
 }
 
 .card-library-card.rare {
   border-color: #ffc857;
+  border-width: 3px;
 }
 
 .card-picker-body {
@@ -484,19 +478,12 @@ td.zero {
 }
 
 .card.stat-themed {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--stat-color) 15%, #17263d), #17263d 58%);
-  border-color: color-mix(in srgb, var(--stat-color) 78%, #647892);
+  background: var(--card-bg);
 }
 
 .card.stat-themed strong {
-  color: color-mix(in srgb, var(--stat-color) 76%, #ffffff);
-}
-
-.card em {
-  color: #a9bdd8;
-  font-size: 12px;
-  font-style: normal;
-  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
 }
 
 .card strong {
@@ -506,10 +493,12 @@ td.zero {
 
 .card.uncommon {
   border-color: #8ef6c5;
+  border-width: 2px;
 }
 
 .card.rare {
   border-color: #ffc857;
+  border-width: 3px;
 }
 
 .card-preview {
