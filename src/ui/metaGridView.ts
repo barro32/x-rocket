@@ -17,31 +17,53 @@ export function renderMetaGrid(state: GameState): string {
   const maxX = Math.max(...xs) + size + padding;
   const minY = Math.min(...ys) - size - padding;
   const maxY = Math.max(...ys) + size + padding;
+  const fitViewBox = `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
+  const defaultZoom = 0.72;
+  const defaultWidth = (maxX - minX) * defaultZoom;
+  const defaultHeight = (maxY - minY) * defaultZoom;
+  const defaultX = minX + ((maxX - minX) - defaultWidth) / 2;
+  const defaultY = minY + ((maxY - minY) - defaultHeight) / 2;
+  const defaultViewBox = `${defaultX} ${defaultY} ${defaultWidth} ${defaultHeight}`;
 
   return `
-    <svg class="hex-map" viewBox="${minX} ${minY} ${maxX - minX} ${maxY - minY}" role="group" aria-label="Meta Grid">
-      ${positionedNodes.map(({ node, x, y }) => {
-        const bought = state.boughtMetaNodes.includes(node.id);
-        const unlocked = isMetaNodeUnlocked(state, node.id);
-        const buyable = canBuyMetaNode(state, node.id);
-        const temporary = node.effect.type === 'autoRerollLowest';
-        const category = categoryForMetaEffect(node.effect);
-        return `
-          <g
-            class="hex-node ${category ? 'stat-themed' : ''} ${bought ? 'bought' : ''} ${unlocked ? '' : 'locked'} ${buyable ? 'buyable' : ''} ${temporary ? 'temporary' : ''}"
-            ${category ? `style="--stat-color: ${categoryColors[category]}"` : ''}
-            data-meta="${node.id}"
-            transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"
-            tabindex="${buyable ? '0' : '-1'}"
-            role="button"
-            aria-disabled="${buyable ? 'false' : 'true'}"
-          >
-            <polygon points="${points}" />
-            <text class="hex-label">${escapeHtml(node.label)}</text>
-          </g>
-        `;
-      }).join('')}
-    </svg>
+    <div class="meta-map-shell">
+      <div class="meta-map-controls" aria-label="Meta grid view controls">
+        <button data-action="meta-zoom-in" aria-label="Zoom in">+</button>
+        <button data-action="meta-zoom-out" aria-label="Zoom out">-</button>
+        <button data-action="meta-fit">Fit</button>
+      </div>
+      <svg
+        class="hex-map"
+        viewBox="${defaultViewBox}"
+        data-meta-map
+        data-default-view-box="${defaultViewBox}"
+        data-fit-view-box="${fitViewBox}"
+        role="group"
+        aria-label="Meta Grid"
+      >
+        ${positionedNodes.map(({ node, x, y }) => {
+          const bought = state.boughtMetaNodes.includes(node.id);
+          const unlocked = isMetaNodeUnlocked(state, node.id);
+          const buyable = canBuyMetaNode(state, node.id);
+          const temporary = node.effect.type === 'autoRerollLowest';
+          const category = categoryForMetaEffect(node.effect);
+          return `
+            <g
+              class="hex-node ${category ? 'stat-themed' : ''} ${bought ? 'bought' : ''} ${unlocked ? '' : 'locked'} ${buyable ? 'buyable' : ''} ${temporary ? 'temporary' : ''}"
+              ${category ? `style="--stat-color: ${categoryColors[category]}"` : ''}
+              data-meta="${node.id}"
+              transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"
+              tabindex="${buyable ? '0' : '-1'}"
+              role="button"
+              aria-disabled="${buyable ? 'false' : 'true'}"
+            >
+              <polygon points="${points}" />
+              <text class="hex-label">${escapeHtml(node.label)}</text>
+            </g>
+          `;
+        }).join('')}
+      </svg>
+    </div>
   `;
 }
 

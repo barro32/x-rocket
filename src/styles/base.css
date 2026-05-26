@@ -587,21 +587,52 @@ td.zero {
 .meta-body {
   display: grid;
   gap: 22px;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
+  grid-template-columns: minmax(560px, 1fr) minmax(360px, 460px);
   margin: 18px auto 0;
-  max-width: 1360px;
+  max-width: 1540px;
   min-height: 0;
   width: 100%;
 }
 
-.hex-map {
+.meta-map-shell {
   background: rgba(12, 19, 34, 0.42);
   border: 1px solid rgba(160, 181, 210, 0.2);
   border-radius: 8px;
-  display: block;
-  height: min(640px, calc(100vh - 154px));
+  height: min(720px, calc(100vh - 142px));
   margin: 0;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  position: relative;
+  touch-action: none;
   width: 100%;
+}
+
+.hex-map {
+  cursor: grab;
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.hex-map.panning {
+  cursor: grabbing;
+}
+
+.meta-map-controls {
+  display: flex;
+  gap: 6px;
+  left: 12px;
+  position: absolute;
+  top: 12px;
+  z-index: 1;
+}
+
+.meta-map-controls button {
+  background: rgba(217, 237, 247, 0.94);
+  min-height: 34px;
+  min-width: 34px;
+  padding: 6px 10px;
 }
 
 .hex-node {
@@ -627,7 +658,7 @@ td.zero {
 .hex-node text {
   dominant-baseline: middle;
   fill: #edf5ff;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   pointer-events: none;
   text-anchor: middle;
@@ -682,7 +713,7 @@ td.zero {
   background: rgba(12, 19, 34, 0.86);
   border: 1px solid rgba(160, 181, 210, 0.24);
   border-radius: 8px;
-  max-height: min(640px, calc(100vh - 154px));
+  max-height: min(720px, calc(100vh - 142px));
   overflow: auto;
   padding: 18px;
 }
@@ -755,7 +786,7 @@ td.zero {
     bottom: 16px;
   }
 
-  .hex-map {
+  .meta-map-shell {
     height: min(520px, calc(100vh - 180px));
   }
 

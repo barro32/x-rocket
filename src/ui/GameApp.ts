@@ -8,10 +8,14 @@ import { categoryColors, categoryLabels } from '../sim/categories';
 import { renderDiceGrid } from './diceGridView';
 import { escapeHtml, renderMetaGrid } from './metaGridView';
 
+type ViewBox = { x: number; y: number; width: number; height: number };
+
 export class GameApp {
   private state: GameState;
   private readonly ui: HTMLDivElement;
   private showUnlockedCards = false;
+  private metaViewBox?: ViewBox;
+  private suppressMetaClickUntil = 0;
 
   constructor(root: HTMLElement) {
     this.state = loadGame();
@@ -114,17 +118,26 @@ export class GameApp {
           this.render();
         } else if (action === 'close-meta') {
           this.state = restartRun(this.state);
+          this.metaViewBox = undefined;
           saveGame(this.state);
           this.render();
         } else if (action === 'restart') {
           this.state = restartRun(this.state);
+          this.metaViewBox = undefined;
           saveGame(this.state);
           this.render();
         } else if (action === 'reset') {
           clearSave();
           this.state = createInitialState();
+          this.metaViewBox = undefined;
           saveGame(this.state);
           this.render();
+        } else if (action === 'meta-zoom-in') {
+          this.zoomMetaMap(0.82);
+        } else if (action === 'meta-zoom-out') {
+          this.zoomMetaMap(1.22);
+        } else if (action === 'meta-fit') {
+          this.fitMetaMap();
         }
       });
     });
@@ -156,6 +169,11 @@ export class GameApp {
         if (!id) {
           return;
         }
+
+        if (performance.now() < this.suppressMetaClickUntil) {
+          return;
+        }
+
         this.state = buyMetaNode(this.state, id as MetaNodeId);
         saveGame(this.state);
         this.render();
@@ -167,6 +185,148 @@ export class GameApp {
         }
       });
     });
+
+    this.bindMetaMapEvents();
+  }
+
+  private bindMetaMapEvents(): void {
+    const map = this.ui.querySelector<SVGSVGElement>('[data-meta-map]');
+    if (!map) {
+      return;
+    }
+
+    const defaultViewBox = this.parseViewBox(map.dataset.defaultViewBox);
+    if (!this.metaViewBox && defaultViewBox) {
+      this.metaViewBox = defaultViewBox;
+    }
+    this.applyMetaViewBox(map);
+
+    map.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      this.zoomMetaMap(event.deltaY < 0 ? 0.88 : 1.14);
+    }, { passive: false });
+
+    let dragStart:
+      | { pointerId: number; clientX: number; clientY: number; viewBox: ViewBox; moved: boolean }
+      | undefined;
+
+    map.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      const viewBox = this.currentMetaViewBox(map);
+      if (!viewBox) {
+        return;
+      }
+
+      dragStart = {
+        pointerId: event.pointerId,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        viewBox,
+        moved: false,
+      };
+      map.setPointerCapture(event.pointerId);
+    });
+
+    map.addEventListener('pointermove', (event) => {
+      if (!dragStart || dragStart.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - dragStart.clientX;
+      const deltaY = event.clientY - dragStart.clientY;
+      if (!dragStart.moved && Math.hypot(deltaX, deltaY) < 4) {
+        return;
+      }
+
+      dragStart.moved = true;
+      map.classList.add('panning');
+      const scaleX = dragStart.viewBox.width / map.clientWidth;
+      const scaleY = dragStart.viewBox.height / map.clientHeight;
+      this.metaViewBox = {
+        ...dragStart.viewBox,
+        x: dragStart.viewBox.x - (deltaX * scaleX),
+        y: dragStart.viewBox.y - (deltaY * scaleY),
+      };
+      this.applyMetaViewBox(map);
+    });
+
+    const endDrag = (event: PointerEvent) => {
+      if (dragStart?.pointerId !== event.pointerId) {
+        return;
+      }
+
+      if (dragStart.moved) {
+        this.suppressMetaClickUntil = performance.now() + 250;
+      }
+
+      dragStart = undefined;
+      map.classList.remove('panning');
+      if (map.hasPointerCapture(event.pointerId)) {
+        map.releasePointerCapture(event.pointerId);
+      }
+    };
+
+    map.addEventListener('pointerup', endDrag);
+    map.addEventListener('pointercancel', endDrag);
+  }
+
+  private zoomMetaMap(multiplier: number): void {
+    const map = this.ui.querySelector<SVGSVGElement>('[data-meta-map]');
+    const viewBox = map ? this.currentMetaViewBox(map) : undefined;
+    const fitViewBox = map ? this.parseViewBox(map.dataset.fitViewBox) : undefined;
+    if (!map || !viewBox || !fitViewBox) {
+      return;
+    }
+
+    const minWidth = fitViewBox.width * 0.22;
+    const maxWidth = fitViewBox.width * 1.25;
+    const width = Math.min(maxWidth, Math.max(minWidth, viewBox.width * multiplier));
+    const height = width * (viewBox.height / viewBox.width);
+    const centerX = viewBox.x + viewBox.width / 2;
+    const centerY = viewBox.y + viewBox.height / 2;
+    this.metaViewBox = {
+      x: centerX - width / 2,
+      y: centerY - height / 2,
+      width,
+      height,
+    };
+    this.applyMetaViewBox(map);
+  }
+
+  private fitMetaMap(): void {
+    const map = this.ui.querySelector<SVGSVGElement>('[data-meta-map]');
+    const fitViewBox = map ? this.parseViewBox(map.dataset.fitViewBox) : undefined;
+    if (!map || !fitViewBox) {
+      return;
+    }
+
+    this.metaViewBox = fitViewBox;
+    this.applyMetaViewBox(map);
+  }
+
+  private currentMetaViewBox(map: SVGSVGElement): ViewBox | undefined {
+    return this.metaViewBox ?? this.parseViewBox(map.getAttribute('viewBox'));
+  }
+
+  private applyMetaViewBox(map: SVGSVGElement): void {
+    const viewBox = this.currentMetaViewBox(map);
+    if (!viewBox) {
+      return;
+    }
+
+    map.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+  }
+
+  private parseViewBox(value: string | undefined | null): ViewBox | undefined {
+    const parts = value?.split(/\s+/).map(Number);
+    if (!parts || parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+      return undefined;
+    }
+
+    return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
   }
 
   private renderLaunchResult(): string {
