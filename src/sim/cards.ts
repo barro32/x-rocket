@@ -1,4 +1,4 @@
-import { categoryLabel, diceCategories } from './categories';
+import { activeDiceCategoriesFor, categoryLabel, diceCategories } from './categories';
 import { pickOne, type Rng } from './rng';
 import { metaNodeById } from './meta';
 import type { CardEffect, CardRarity, CardSpec, DiceCategory, MetaNodeId } from './types';
@@ -30,10 +30,11 @@ export function draftCards(rng: Rng, count = 3, boughtMetaNodes: MetaNodeId[] = 
   const used = new Set<string>();
   let attempts = 0;
   const unlockedCardIds = [...unlockedCardsFor(boughtMetaNodes)];
+  const activeCategories = activeDiceCategoriesFor(boughtMetaNodes);
 
   while (cards.length < count && attempts < count * 12) {
     attempts += 1;
-    const card = createCard(rng, unlockedCardIds, boughtMetaNodes);
+    const card = createCard(rng, unlockedCardIds, boughtMetaNodes, activeCategories);
     if (used.has(card.id)) {
       continue;
     }
@@ -42,7 +43,7 @@ export function draftCards(rng: Rng, count = 3, boughtMetaNodes: MetaNodeId[] = 
   }
 
   while (cards.length < count) {
-    const category = diceCategories[cards.length % diceCategories.length];
+    const category = activeCategories[cards.length % activeCategories.length];
     const sideCount = randomFaceCardSideCount(category, boughtMetaNodes);
     const faceIndex = cards.length % 6;
     const faceIndexes = Array.from({ length: sideCount }, (_, index) => (faceIndex + index) % 6);
@@ -62,8 +63,9 @@ export function draftCards(rng: Rng, count = 3, boughtMetaNodes: MetaNodeId[] = 
 }
 
 export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntry[] {
+  const activeCategories = activeDiceCategoriesFor(boughtMetaNodes);
   return [
-    ...diceCategories.map((category): CardPoolEntry => {
+    ...activeCategories.map((category): CardPoolEntry => {
       const sideCount = randomFaceCardSideCount(category, boughtMetaNodes);
       return {
         id: `base-random-face-${category}`,
@@ -76,7 +78,7 @@ export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntr
         source: 'base',
       };
     }),
-    ...diceCategories.map((category): CardPoolEntry => ({
+    ...activeCategories.map((category): CardPoolEntry => ({
       id: `base-x2-${category}`,
       name: `x2 ${categoryLabel(category)}`,
       rarity: 'uncommon',
@@ -84,14 +86,16 @@ export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntr
       affectedCategories: [category],
       source: 'base',
     })),
-    ...uncommonS5Triples.map((categories): CardPoolEntry => ({
-      id: `base-s5-${categories.join('-')}`,
-      name: `+1 S5 ${shortCategoryList(categories)}`,
-      rarity: 'uncommon',
-      description: `+1 side 5: ${categories.map(categoryLabel).join(', ')}`,
-      affectedCategories: categories,
-      source: 'base',
-    })),
+    ...uncommonS5Triples
+      .filter((categories) => categories.every((category) => activeCategories.includes(category)))
+      .map((categories): CardPoolEntry => ({
+        id: `base-s5-${categories.join('-')}`,
+        name: `+1 S5 ${shortCategoryList(categories)}`,
+        rarity: 'uncommon',
+        description: `+1 side 5: ${categories.map(categoryLabel).join(', ')}`,
+        affectedCategories: categories,
+        source: 'base',
+      })),
     {
       id: 'base-auto-reroll',
       name: '+1 Auto Reroll',
@@ -101,16 +105,16 @@ export function unlockedCardPoolFor(boughtMetaNodes: MetaNodeId[]): CardPoolEntr
       source: 'base',
     },
     ...[...unlockedCardsFor(boughtMetaNodes)]
-      .map(cardPoolEntryFromUnlockId)
+      .map((cardId) => cardPoolEntryFromUnlockId(cardId, activeCategories))
       .filter((entry): entry is CardPoolEntry => Boolean(entry)),
   ];
 }
 
-function createCard(rng: Rng, unlockedCardIds: string[], boughtMetaNodes: MetaNodeId[]): CardSpec {
+function createCard(rng: Rng, unlockedCardIds: string[], boughtMetaNodes: MetaNodeId[], activeCategories: DiceCategory[]): CardSpec {
   const rarity = rollRarity(rng);
   const matchingUnlockedCardIds = unlockedCardIds.filter((cardId) => unlockedCardRarity(cardId) === rarity);
-  if (matchingUnlockedCardIds.length > 0 && rng.next() < 0.55) {
-    const card = cardFromUnlockId(pickOne(matchingUnlockedCardIds, rng), rng);
+  if (matchingUnlockedCardIds.length > 0) {
+    const card = cardFromUnlockId(pickOne(matchingUnlockedCardIds, rng), rng, activeCategories);
     if (card) {
       return card;
     }
@@ -127,12 +131,15 @@ function createCard(rng: Rng, unlockedCardIds: string[], boughtMetaNodes: MetaNo
     };
   }
 
-  const category = pickOne(diceCategories, rng);
+  const category = pickOne(activeCategories, rng);
   const label = categoryLabel(category);
 
   if (rarity === 'uncommon') {
     if (rng.next() < 0.45) {
-      return uncommonS5TripleCard(pickOne(uncommonS5Triples, rng));
+      const eligibleTriples = uncommonS5Triples.filter((categories) => categories.every((tripleCategory) => activeCategories.includes(tripleCategory)));
+      if (eligibleTriples.length > 0) {
+        return uncommonS5TripleCard(pickOne(eligibleTriples, rng));
+      }
     }
 
     return {
@@ -235,7 +242,7 @@ function shortCategoryList(categories: DiceCategory[]): string {
   }).join('/');
 }
 
-function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
+function cardFromUnlockId(cardId: string, rng: Rng, activeCategories: DiceCategory[]): CardSpec | undefined {
   if (cardId === 'double-highest') {
     return unlockedCard(cardId, 'rare', '2x High', '2x highest roll', [], { type: 'doubleHighestRoll' });
   }
@@ -245,7 +252,10 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
   }
 
   if (cardId === 's6-three-stats') {
-    const categories = randomCategories(rng, 3);
+    if (activeCategories.length < 3) {
+      return undefined;
+    }
+    const categories = randomCategories(rng, 3, activeCategories);
     return unlockedCard(
       `${cardId}-${categories.join('-')}`,
       'rare',
@@ -259,6 +269,9 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
   const plus3 = matchCategoryCard(cardId, 'plus3-minus1-');
   if (plus3) {
     const penaltyCategory = nextCategory(plus3);
+    if (!activeCategories.includes(plus3) || !activeCategories.includes(penaltyCategory)) {
+      return undefined;
+    }
     return unlockedCard(
       cardId,
       'common',
@@ -271,6 +284,9 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
 
   const plus3SideOne = matchCategoryCard(cardId, 'plus3-side1-');
   if (plus3SideOne) {
+    if (!activeCategories.includes(plus3SideOne)) {
+      return undefined;
+    }
     return unlockedCard(cardId, 'common', `+3 ${categoryLabel(plus3SideOne)} S1`, `+3 ${categoryLabel(plus3SideOne)} side 1`, [plus3SideOne], {
       type: 'addFaceValue',
       category: plus3SideOne,
@@ -281,6 +297,9 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
 
   const rareDie = matchCategoryCard(cardId, 'rare-die-');
   if (rareDie) {
+    if (!activeCategories.includes(rareDie)) {
+      return undefined;
+    }
     return unlockedCard(cardId, 'rare', `x2 ${categoryLabel(rareDie)}`, `x2 ${categoryLabel(rareDie)} roll`, [rareDie], {
       type: 'multiplyStat',
       category: rareDie,
@@ -290,6 +309,9 @@ function cardFromUnlockId(cardId: string, rng: Rng): CardSpec | undefined {
 
   const allFaces = matchCategoryCard(cardId, 'all-faces-');
   if (allFaces) {
+    if (!activeCategories.includes(allFaces)) {
+      return undefined;
+    }
     return unlockedCard(cardId, 'rare', `+1 All ${categoryLabel(allFaces)}`, `+1 all ${categoryLabel(allFaces)} faces`, [allFaces], {
       type: 'addAllFaces',
       category: allFaces,
@@ -304,7 +326,7 @@ function unlockedCard(id: string, rarity: CardRarity, name: string, description:
   return { id, rarity, name, description, affectedCategories, effect };
 }
 
-function cardPoolEntryFromUnlockId(cardId: string): CardPoolEntry | undefined {
+function cardPoolEntryFromUnlockId(cardId: string, activeCategories: DiceCategory[]): CardPoolEntry | undefined {
   if (cardId === 'double-highest') {
     return unlockedCardPoolEntry(cardId, 'rare', '2x High', '2x highest roll', []);
   }
@@ -314,12 +336,17 @@ function cardPoolEntryFromUnlockId(cardId: string): CardPoolEntry | undefined {
   }
 
   if (cardId === 's6-three-stats') {
-    return unlockedCardPoolEntry(cardId, 'rare', '+1 S6 x3', '+1 side 6 on 3 predetermined random stats', diceCategories);
+    return activeCategories.length >= 3
+      ? unlockedCardPoolEntry(cardId, 'rare', '+1 S6 x3', '+1 side 6 on 3 predetermined random stats', activeCategories)
+      : undefined;
   }
 
   const plus3 = matchCategoryCard(cardId, 'plus3-minus1-');
   if (plus3) {
     const penaltyCategory = nextCategory(plus3);
+    if (!activeCategories.includes(plus3) || !activeCategories.includes(penaltyCategory)) {
+      return undefined;
+    }
     return unlockedCardPoolEntry(
       cardId,
       'common',
@@ -331,16 +358,25 @@ function cardPoolEntryFromUnlockId(cardId: string): CardPoolEntry | undefined {
 
   const plus3SideOne = matchCategoryCard(cardId, 'plus3-side1-');
   if (plus3SideOne) {
+    if (!activeCategories.includes(plus3SideOne)) {
+      return undefined;
+    }
     return unlockedCardPoolEntry(cardId, 'common', `+3 ${categoryLabel(plus3SideOne)} S1`, `+3 ${categoryLabel(plus3SideOne)} side 1`, [plus3SideOne]);
   }
 
   const rareDie = matchCategoryCard(cardId, 'rare-die-');
   if (rareDie) {
+    if (!activeCategories.includes(rareDie)) {
+      return undefined;
+    }
     return unlockedCardPoolEntry(cardId, 'rare', `x2 ${categoryLabel(rareDie)}`, `x2 ${categoryLabel(rareDie)} roll`, [rareDie]);
   }
 
   const allFaces = matchCategoryCard(cardId, 'all-faces-');
   if (allFaces) {
+    if (!activeCategories.includes(allFaces)) {
+      return undefined;
+    }
     return unlockedCardPoolEntry(cardId, 'rare', `+1 All ${categoryLabel(allFaces)}`, `+1 all ${categoryLabel(allFaces)} faces`, [allFaces]);
   }
 
@@ -371,18 +407,18 @@ function unlockedCardRarity(cardId: string): CardRarity | undefined {
   return undefined;
 }
 
-function randomCategories(rng: Rng, count: number): DiceCategory[] {
+function randomCategories(rng: Rng, count: number, sourceCategories: DiceCategory[]): DiceCategory[] {
   const categories: DiceCategory[] = [];
   let attempts = 0;
-  while (categories.length < Math.min(count, diceCategories.length) && attempts < 24) {
+  while (categories.length < Math.min(count, sourceCategories.length) && attempts < 24) {
     attempts += 1;
-    const category = pickOne(diceCategories, rng);
+    const category = pickOne(sourceCategories, rng);
     if (!categories.includes(category)) {
       categories.push(category);
     }
   }
 
-  for (const category of diceCategories) {
+  for (const category of sourceCategories) {
     if (categories.length >= count) {
       break;
     }
@@ -395,7 +431,7 @@ function randomCategories(rng: Rng, count: number): DiceCategory[] {
 }
 
 function matchCategoryCard(cardId: string, prefix: string): DiceCategory | undefined {
-  const category = cardId.slice(prefix.length);
+  const category = cardId.startsWith(prefix) ? cardId.slice(prefix.length) : '';
   return diceCategories.includes(category as DiceCategory) ? category as DiceCategory : undefined;
 }
 

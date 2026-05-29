@@ -7,6 +7,7 @@ type DiceGridState = Pick<GameState, 'dice' | 'runCards' | 'autoRerollLowest' | 
 
 interface DiceGridProps {
   state: DiceGridState;
+  categories?: DiceCategory[];
   compareTo?: DiceGridState;
   showRunEffects?: boolean;
   previewCard?: CardSpec;
@@ -17,11 +18,11 @@ interface DieModifier {
   preview: boolean;
 }
 
-export function DiceGrid({ state, compareTo, showRunEffects = true, previewCard }: DiceGridProps): ReactNode {
+export function DiceGrid({ state, categories = diceCategories, compareTo, showRunEffects = true, previewCard }: DiceGridProps): ReactNode {
   return (
     <>
       <div>
-        {diceCategories.map((category) => {
+        {categories.map((category) => {
           const die = state.dice[category];
           return (
             <div

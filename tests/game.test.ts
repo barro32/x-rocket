@@ -6,22 +6,22 @@ import { SequenceRng } from './helpers/SequenceRng';
 describe('game state flow', () => {
   it('explodes and reaches 0m when any die rolls zero', () => {
     const state = createInitialState(1);
-    const next = simulateLaunch(state, new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6]));
+    const next = simulateLaunch(state, new SequenceRng([0.9, 0.9]));
 
     expect(next.lastLaunch?.roll.exploded).toBe(true);
     expect(next.lastLaunch?.heightMeters).toBe(0);
     expect(next.money).toBe(4);
   });
 
-  it('uses linear height: score 5 reaches 5m', () => {
+  it('uses linear height with the active starting dice', () => {
     const state = createInitialState(1);
     const next = simulateLaunch(state, new SequenceRng([0.2, 0.2, 0.2, 0.2, 0.2, 0.1, 0.2, 0.3]));
 
     expect(next.lastLaunch?.roll.exploded).toBe(false);
-    expect(next.lastLaunch?.roll.score).toBe(5);
-    expect(next.lastLaunch?.heightMeters).toBe(5);
+    expect(next.lastLaunch?.roll.score).toBe(8);
+    expect(next.lastLaunch?.heightMeters).toBe(8);
     expect(next.pendingCardAwards).toBe(1);
-    expect(next.metaCurrency).toBe(1);
+    expect(next.metaCurrency).toBe(2);
   });
 
   it('awards one card pick after every successful launch', () => {
@@ -37,7 +37,7 @@ describe('game state flow', () => {
 
   it('does not award a card pick after an exploded launch', () => {
     const state = createInitialState(1);
-    const next = simulateLaunch(state, new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6]));
+    const next = simulateLaunch(state, new SequenceRng([0.9, 0.9]));
 
     expect(next.pendingCardAwards).toBe(0);
     expect(next.pendingCardChoices).toHaveLength(0);
@@ -51,15 +51,15 @@ describe('game state flow', () => {
     const restarted = restartRun({ ...second, money: 0 });
     const third = simulateLaunch(restarted, new SequenceRng([0.2, 0.2, 0.2, 0.2, 0.2, 0.1, 0.2, 0.3]));
 
-    expect(first.metaCurrency).toBe(1);
-    expect(second.metaCurrency).toBe(1);
-    expect(third.metaCurrency).toBeGreaterThanOrEqual(2);
+    expect(first.metaCurrency).toBe(2);
+    expect(second.metaCurrency).toBe(2);
+    expect(third.metaCurrency).toBeGreaterThanOrEqual(4);
   });
 
   it('claims exactly one meta currency per bankruptcy', () => {
     let state = createInitialState(1);
     for (let i = 0; i < 5; i += 1) {
-      state = simulateLaunch(state, new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6]));
+      state = simulateLaunch(state, new SequenceRng([0.9, 0.9]));
     }
 
     expect(isBankrupt(state)).toBe(true);
@@ -96,7 +96,7 @@ describe('game state flow', () => {
       boughtMetaNodes: ['reroll-lowest-0', 'reroll-lowest-1'],
     };
     const restarted = restartRun({ ...state, money: 0 });
-    const launched = simulateLaunch(restarted, new SequenceRng([0.6, 0.6, 0.6, 0.6, 0.6, 0.2, 0.2]));
+    const launched = simulateLaunch(restarted, new SequenceRng([0.9, 0.9, 0.2, 0.2]));
 
     expect(restarted.temporaryAutoRerollLowest).toBe(2);
     expect(launched.temporaryAutoRerollLowest).toBe(0);

@@ -71,6 +71,7 @@ export interface LaunchResult {
 
 export type MetaNodeEffect =
   | { type: 'startingMoney' }
+  | { type: 'unlockDice'; category: DiceCategory }
   | { type: 'addFaceValue'; category: DiceCategory; faceIndex: number; amount: number }
   | { type: 'addWeakestFace'; amount: number }
   | { type: 'autoRerollLowest'; amount: number }

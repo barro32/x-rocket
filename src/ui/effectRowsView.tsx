@@ -61,6 +61,8 @@ export function metaNodeTitle(node: MetaNodeSpec): string {
   switch (node.effect.type) {
     case 'startingMoney':
       return 'Better Starting Money';
+    case 'unlockDice':
+      return `Unlock ${categoryLabels[node.effect.category]}`;
     case 'addFaceValue':
       return `${signed(node.effect.amount)} ${categoryLabels[node.effect.category]}`;
     case 'addWeakestFace':
@@ -143,6 +145,8 @@ function metaEffectRows(effect: MetaNodeEffect): EffectRow[] {
   switch (effect.type) {
     case 'startingMoney':
       return [{ dice: 'Run', target: 'Starting money', value: '$10' }];
+    case 'unlockDice':
+      return [categoryRow(effect.category, 'Dice', 'Unlock')];
     case 'addFaceValue':
       return [categoryRow(effect.category, sideName(effect.faceIndex), signed(effect.amount))];
     case 'addWeakestFace':

@@ -5,7 +5,7 @@ import { applyCard, startingDice } from '../sim/dice';
 import { unlockedCardPoolFor } from '../sim/cards';
 import { clearSave, loadGame, saveGame } from '../sim/save';
 import type { CardSpec, DiceCategory, GameState, LaunchResult, MetaNodeId, RollEvent } from '../sim/types';
-import { categoryColors, categoryLabels } from '../sim/categories';
+import { activeDiceCategoriesFor, categoryColors, categoryLabels } from '../sim/categories';
 import { DiceGrid } from './diceGridView';
 import { CardPoolSummary, CardSummary, MetaNodeSummary, RollOnlyCardSummary } from './effectRowsView';
 import { MetaGrid, type ViewBox } from './metaGridView';
@@ -16,9 +16,9 @@ export function GameApp(): ReactNode {
   const [metaViewBox, setMetaViewBox] = useState<ViewBox | undefined>();
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [selectedMetaId, setSelectedMetaId] = useState<MetaNodeId | undefined>();
-  const [suppressMetaClickUntil, setSuppressMetaClickUntil] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const bankrupt = isBankrupt(state);
+  const activeCategories = activeDiceCategoriesFor(state.boughtMetaNodes);
 
   function updateState(next: GameState): void {
     const rewarded = applyBankruptcyReward(next);
@@ -86,12 +86,13 @@ export function GameApp(): ReactNode {
 
       <section className="pointer-events-auto absolute right-[18px] top-24 max-h-[calc(100vh-116px)] w-[360px] overflow-auto rounded-lg border border-[rgba(160,181,210,0.25)] bg-[rgba(12,19,34,0.88)] p-3.5 max-[860px]:left-3 max-[860px]:right-3 max-[860px]:top-[420px] max-[860px]:w-auto">
         <h2>Dice</h2>
-        <DiceGrid state={state} />
+        <DiceGrid state={state} categories={activeCategories} />
       </section>
 
       {state.pendingCardChoices.length > 0 ? (
         <CardPicker
           state={state}
+          activeCategories={activeCategories}
           selectedCardIndex={selectedCardIndex}
           onSelectCard={setSelectedCardIndex}
           onChooseCard={choosePendingCard}
@@ -109,10 +110,8 @@ export function GameApp(): ReactNode {
           <MetaGrid
             state={state}
             viewBox={metaViewBox}
-            suppressClickUntil={suppressMetaClickUntil}
             onBuyNode={buyNode}
             onHoverNode={setSelectedMetaId}
-            onSuppressClickUntil={setSuppressMetaClickUntil}
             onViewBoxChange={setMetaViewBox}
           />
           <div className="max-h-[min(720px,calc(100vh-142px))] overflow-auto rounded-lg border border-[rgba(160,181,210,0.24)] bg-[rgba(12,19,34,0.86)] p-[18px] max-[860px]:max-h-[280px]">
@@ -249,11 +248,13 @@ function Milestones({ result }: { result: LaunchResult }): ReactNode {
 
 function CardPicker({
   state,
+  activeCategories,
   selectedCardIndex,
   onSelectCard,
   onChooseCard,
 }: {
   state: GameState;
+  activeCategories: DiceCategory[];
   selectedCardIndex: number;
   onSelectCard: (index: number) => void;
   onChooseCard: (index: number) => void;
@@ -278,7 +279,7 @@ function CardPicker({
             ))}
           </div>
           <div className="rounded-lg border border-[rgba(160,181,210,0.24)] bg-[rgba(12,19,34,0.72)] p-3.5">
-            <CardPreview state={state} index={selectedCardIndex} />
+            <CardPreview state={state} activeCategories={activeCategories} index={selectedCardIndex} />
           </div>
         </div>
       </section>
@@ -314,13 +315,13 @@ function UnlockedCards({ state, onClose }: { state: GameState; onClose: () => vo
   );
 }
 
-function CardPreview({ state, index }: { state: GameState; index: number }): ReactNode {
+function CardPreview({ state, activeCategories, index }: { state: GameState; activeCategories: DiceCategory[]; index: number }): ReactNode {
   const card = state.pendingCardChoices[index];
   const after = card ? previewCardState(state, card) : state;
   return (
     <div className="grid grid-cols-1 gap-3">
       <div>
-        <DiceGrid state={after} compareTo={state} showRunEffects={false} previewCard={card} />
+        <DiceGrid state={after} categories={activeCategories} compareTo={state} showRunEffects={false} previewCard={card} />
         {card ? <RollOnlyCardSummary card={card} /> : null}
       </div>
     </div>
@@ -332,6 +333,7 @@ function MetaPreview({ state, id }: { state: GameState; id?: MetaNodeId }): Reac
   const buyable = id ? canBuyMetaNode(state, id) : false;
   const afterIds = id && buyable ? [...state.boughtMetaNodes, id] : state.boughtMetaNodes;
   const after = metaPreviewState(afterIds);
+  const afterCategories = activeDiceCategoriesFor(afterIds);
   const node = id ? metaNodeById[id] : undefined;
   const moneyChanged = before.money !== after.money;
   const owned = Boolean(id && state.boughtMetaNodes.includes(id));
@@ -346,7 +348,7 @@ function MetaPreview({ state, id }: { state: GameState; id?: MetaNodeId }): Reac
         <div className={`text-[28px] font-extrabold ${moneyChanged ? 'text-[#ffe4a6]' : 'text-rocket-text'}`}>${after.money}</div>
         <span className="mt-1 block text-[13px] text-rocket-muted">{status}</span>
       </div>
-      <DiceGrid state={after} compareTo={before} showRunEffects={false} />
+      <DiceGrid state={after} categories={afterCategories} compareTo={before} showRunEffects={false} />
     </>
   );
 }

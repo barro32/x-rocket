@@ -1,11 +1,12 @@
+import { activeDiceCategoriesFor, unlockDiceNodeId } from './categories';
 import type { DiceCategory, GameState, MetaNodeId, MetaNodeSpec } from './types';
 
 const ringOne: MetaNodeSpec[] = [
   faceNode('thrusters-0', '+1 Thrusters S1', 'thrusters', 0),
   faceNode('fuel-0', '+1 Fuel S1', 'fuel', 0),
-  faceNode('aerodynamics-0', '+1 Aero S1', 'aerodynamics', 0),
-  faceNode('guidance-0', '+1 Guidance S1', 'guidance', 0),
-  faceNode('weight-0', '+1 Weight S1', 'weight', 0),
+  unlockDiceNode('aerodynamics'),
+  unlockDiceNode('guidance'),
+  unlockDiceNode('weight'),
   {
     id: 'weakest-0',
     label: '+1 Weakest',
@@ -14,77 +15,52 @@ const ringOne: MetaNodeSpec[] = [
   },
 ];
 
-const faceUpgradeSpecs = categoryCycle().flatMap((category) => [
-  ...extraFaceUpgradeSpecs(category, 1, 3),
-  ...extraFaceUpgradeSpecs(category, 0, 2, 2),
-  ...extraFaceUpgradeSpecs(category, 2, 2),
-  ...extraFaceUpgradeSpecs(category, 3, 2),
-  ...extraFaceUpgradeSpecs(category, 4, 1),
-]);
-
-const unlockSpecs = [
-  ...categoryCycle().map((category, index) => randomFaceCardUpgradeSpec(category, index)),
-  rerollLowestSpec('reroll-lowest-0', '+1 Reroll Low', 0),
-  rerollLowestSpec('reroll-lowest-1', '+1 Reroll Low', 1),
-  unlockNodeSpec('unlock-double-highest', 'Unlock Rare 2x High', 'double-highest'),
-  ...categoryCycle().map((category, index) => unlockNodeSpec(
-    `unlock-plus3-minus1-${category}`,
-    `Unlock +3 ${shortCategory(category)} -1 ${shortCategory(nextCategory(category))}`,
-    `plus3-minus1-${category}`,
-    index,
-  )),
-  ...categoryCycle().map((category, index) => unlockNodeSpec(
-    `unlock-plus3-side1-${category}`,
-    `Unlock +3 ${shortCategory(category)} S1`,
-    `plus3-side1-${category}`,
-    index + 5,
-  )),
-  ...categoryCycle().map((category, index) => unlockNodeSpec(
-    `unlock-rare-die-${category}`,
-    `Unlock Rare x2 ${shortCategory(category)}`,
-    `rare-die-${category}`,
-    index + 10,
-  )),
-  unlockNodeSpec('unlock-s6-three-stats', 'Unlock Rare +1 S6 x3', 's6-three-stats', 15),
-  unlockNodeSpec('unlock-top-bottom', 'Unlock +5 High -1 Low', 'top-bottom'),
-  ...categoryCycle().map((category, index) => unlockNodeSpec(
-    `unlock-all-faces-${category}`,
-    `Unlock +1 All ${shortCategory(category)}`,
-    `all-faces-${category}`,
-    index + 16,
-  )),
+const ringTwo: MetaNodeSpec[] = [
+  faceUpgradeNode('thrusters', 1),
+  faceUpgradeNode('fuel', 1),
+  faceUpgradeNode('thrusters', 0, 2),
+  faceUpgradeNode('fuel', 0, 2),
+  randomFaceCardUpgradeNode('thrusters'),
+  randomFaceCardUpgradeNode('fuel'),
+  rerollLowestNode('reroll-lowest-0'),
+  unlockCardNode('unlock-top-bottom', 'Unlock +5 High -1 Low', 'top-bottom'),
+  plus3Minus1UnlockNode('thrusters'),
+  plus3Minus1UnlockNode('fuel'),
+  plus3SideOneUnlockNode('thrusters'),
+  plus3SideOneUnlockNode('fuel'),
 ];
 
-const expansionNodes = [...faceUpgradeSpecs, ...unlockSpecs].map((spec): MetaNodeSpec => {
-  if (spec.kind === 'face') {
-    return faceNode(spec.id, spec.label, spec.category, spec.faceIndex);
-  }
+const ringThree: MetaNodeSpec[] = [
+  ...unlockedDiceCategories().map((category) => faceUpgradeNode(category, 1)),
+  ...unlockedDiceCategories().map((category) => faceUpgradeNode(category, 0, 2)),
+  ...unlockedDiceCategories().map(randomFaceCardUpgradeNode),
+  ...unlockedDiceCategories().map(plus3SideOneUnlockNode),
+  rareDieUnlockNode('thrusters'),
+  rareDieUnlockNode('fuel'),
+  unlockCardNode('unlock-double-highest', 'Unlock Rare 2x High', 'double-highest'),
+  rerollLowestNode('reroll-lowest-1'),
+  plus3Minus1UnlockNode('aerodynamics'),
+  plus3Minus1UnlockNode('guidance'),
+];
 
-  if (spec.kind === 'randomFaceCardUpgrade') {
-    return {
-      id: spec.id,
-      label: spec.label,
-      cost: 1,
-      effect: { type: 'upgradeRandomFaceCard', category: spec.category, amount: spec.amount },
-    };
-  }
+const ringFour: MetaNodeSpec[] = [
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 1, 2)),
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 2)),
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 3)),
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 0, 3)),
+  ...unlockedDiceCategories().map(rareDieUnlockNode),
+  unlockCardNode('unlock-s6-three-stats', 'Unlock Rare +1 S6 x3', 's6-three-stats'),
+];
 
-  if (spec.kind === 'rerollLowest') {
-    return {
-      id: spec.id,
-      label: spec.label,
-      cost: 1,
-      effect: { type: 'autoRerollLowest', amount: spec.amount },
-    };
-  }
-
-  return {
-    id: spec.id,
-    label: spec.label,
-    cost: 1,
-    effect: { type: 'unlockCard', cardId: spec.cardId },
-  };
-});
+const ringFive: MetaNodeSpec[] = [
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 1, 3)),
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 2, 2)),
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 3, 2)),
+  ...categoryCycle().map((category) => faceUpgradeNode(category, 4)),
+  ...unlockedDiceCategories().map((category) => faceUpgradeNode(category, 0, 4)),
+  ...categoryCycle().map(allFacesUnlockNode),
+  plus3Minus1UnlockNode('weight'),
+];
 
 export const metaNodes: MetaNodeSpec[] = [
   {
@@ -94,7 +70,10 @@ export const metaNodes: MetaNodeSpec[] = [
     effect: { type: 'startingMoney' },
   },
   ...ringOne,
-  ...expansionNodes,
+  ...ringTwo,
+  ...ringThree,
+  ...ringFour,
+  ...ringFive,
 ];
 
 export const metaNodeById = Object.fromEntries(metaNodes.map((node) => [node.id, node])) as Record<MetaNodeId, MetaNodeSpec>;
@@ -121,6 +100,10 @@ export function canBuyMetaNode(state: GameState, id: MetaNodeId): boolean {
 
   if (id === 'startingCapital') {
     return true;
+  }
+
+  if (isCategoryLockedForNode(state, node)) {
+    return false;
   }
 
   return state.boughtMetaNodes.some((boughtId) => {
@@ -172,6 +155,124 @@ function faceNode(
   };
 }
 
+function unlockDiceNode(category: DiceCategory): MetaNodeSpec {
+  return {
+    id: unlockDiceNodeId(category),
+    label: `Unlock ${shortCategory(category)}`,
+    cost: 1,
+    effect: { type: 'unlockDice', category },
+  };
+}
+
+function faceUpgradeNode(category: DiceCategory, faceIndex: number, instance = 1): MetaNodeSpec {
+  return faceNode(
+    faceUpgradeId(category, faceIndex, instance),
+    `+1 ${shortCategory(category)} S${faceIndex + 1}`,
+    category,
+    faceIndex,
+  );
+}
+
+function randomFaceCardUpgradeNode(category: DiceCategory): MetaNodeSpec {
+  return {
+    id: `upgrade-random-face-card-${category}`,
+    label: `Cards: +2 ${shortCategory(category)}`,
+    cost: 1,
+    effect: { type: 'upgradeRandomFaceCard', category, amount: 2 },
+  };
+}
+
+function rerollLowestNode(id: MetaNodeId): MetaNodeSpec {
+  return {
+    id,
+    label: '+1 Reroll Low',
+    cost: 1,
+    effect: { type: 'autoRerollLowest', amount: 1 },
+  };
+}
+
+function unlockCardNode(id: MetaNodeId, label: string, cardId: string): MetaNodeSpec {
+  return {
+    id,
+    label,
+    cost: 1,
+    effect: { type: 'unlockCard', cardId },
+  };
+}
+
+function plus3Minus1UnlockNode(category: DiceCategory): MetaNodeSpec {
+  return unlockCardNode(
+    `unlock-plus3-minus1-${category}`,
+    `Unlock +3 ${shortCategory(category)} -1 ${shortCategory(nextCategory(category))}`,
+    `plus3-minus1-${category}`,
+  );
+}
+
+function plus3SideOneUnlockNode(category: DiceCategory): MetaNodeSpec {
+  return unlockCardNode(
+    `unlock-plus3-side1-${category}`,
+    `Unlock +3 ${shortCategory(category)} S1`,
+    `plus3-side1-${category}`,
+  );
+}
+
+function rareDieUnlockNode(category: DiceCategory): MetaNodeSpec {
+  return unlockCardNode(
+    `unlock-rare-die-${category}`,
+    `Unlock Rare x2 ${shortCategory(category)}`,
+    `rare-die-${category}`,
+  );
+}
+
+function allFacesUnlockNode(category: DiceCategory): MetaNodeSpec {
+  return unlockCardNode(
+    `unlock-all-faces-${category}`,
+    `Unlock +1 All ${shortCategory(category)}`,
+    `all-faces-${category}`,
+  );
+}
+
+function isCategoryLockedForNode(state: GameState, node: MetaNodeSpec): boolean {
+  const activeCategories = activeDiceCategoriesFor(state.boughtMetaNodes);
+  switch (node.effect.type) {
+    case 'addFaceValue':
+    case 'upgradeRandomFaceCard':
+      return !activeCategories.includes(node.effect.category);
+    case 'unlockCard':
+      if (node.effect.cardId === 's6-three-stats') {
+        return activeCategories.length < 3;
+      }
+      return !categoriesForCardId(node.effect.cardId).every((category) => activeCategories.includes(category));
+    case 'startingMoney':
+    case 'unlockDice':
+    case 'addWeakestFace':
+    case 'autoRerollLowest':
+      return false;
+  }
+}
+
+function categoriesForCardId(cardId: string): DiceCategory[] {
+  if (cardId === 'double-highest' || cardId === 'top-bottom' || cardId === 's6-three-stats') {
+    return [];
+  }
+
+  const plus3 = matchCategoryCard(cardId, 'plus3-minus1-');
+  if (plus3) {
+    return [plus3, nextCategory(plus3)];
+  }
+
+  return [
+    matchCategoryCard(cardId, 'plus3-side1-'),
+    matchCategoryCard(cardId, 'rare-die-'),
+    matchCategoryCard(cardId, 'all-faces-'),
+  ].filter((category): category is DiceCategory => Boolean(category));
+}
+
+function matchCategoryCard(cardId: string, prefix: string): DiceCategory | undefined {
+  const category = cardId.startsWith(prefix) ? cardId.slice(prefix.length) : '';
+  return categoryCycle().includes(category as DiceCategory) ? category as DiceCategory : undefined;
+}
+
 function coordForOrderedIndex(index: number): [number, number, number] {
   if (index === 0) {
     return [0, 0, 0];
@@ -213,47 +314,16 @@ function ringCoords(radius: number): Array<[number, number, number]> {
   return coords;
 }
 
-function unlockNodeSpec(id: MetaNodeId, label: string, cardId: string, order = 0) {
-  return { kind: 'unlock' as const, id, label, cardId, order };
-}
-
-function randomFaceCardUpgradeSpec(category: DiceCategory, order = 0) {
-  return {
-    kind: 'randomFaceCardUpgrade' as const,
-    id: `upgrade-random-face-card-${category}`,
-    label: `Cards: +2 ${shortCategory(category)}`,
-    category,
-    amount: 2,
-    order,
-  };
-}
-
-function rerollLowestSpec(id: MetaNodeId, label: string, order = 0) {
-  return {
-    kind: 'rerollLowest' as const,
-    id,
-    label,
-    amount: 1,
-    order,
-  };
-}
-
-function extraFaceUpgradeSpecs(category: DiceCategory, faceIndex: number, count: number, startInstance = 1) {
-  return Array.from({ length: count }, (_, index) => ({
-    kind: 'face' as const,
-    id: faceUpgradeId(category, faceIndex, startInstance + index),
-    label: `+1 ${shortCategory(category)} S${faceIndex + 1}`,
-    category,
-    faceIndex,
-  }));
-}
-
 function faceUpgradeId(category: DiceCategory, faceIndex: number, instance: number): MetaNodeId {
   return instance === 1 ? `${category}-${faceIndex}` : `${category}-${faceIndex}-${instance}`;
 }
 
 function categoryCycle(): DiceCategory[] {
   return ['thrusters', 'fuel', 'aerodynamics', 'guidance', 'weight'];
+}
+
+function unlockedDiceCategories(): DiceCategory[] {
+  return ['aerodynamics', 'guidance', 'weight'];
 }
 
 function nextCategory(category: DiceCategory): DiceCategory {

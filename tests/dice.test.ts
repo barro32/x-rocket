@@ -15,13 +15,13 @@ describe('dice state', () => {
     };
     const next = applyCard(createInitialState(1), card);
 
-    expect(next.dice.thrusters.faces).toEqual([3, 2, 2, 1, 1, 1]);
+    expect(next.dice.thrusters.faces).toEqual([6, 5, 4, 3, 2, 1]);
   });
 
   it('applies permanent meta dice face upgrades to starting dice', () => {
     const dice = startingDice(['thrusters-0']);
 
-    expect(dice.thrusters.faces).toEqual([3, 1, 1, 0, 0, 0]);
+    expect(dice.thrusters.faces).toEqual([6, 4, 3, 2, 1, 0]);
   });
 
   it('applies random side card upgrades when a card is chosen with rng', () => {
@@ -34,7 +34,7 @@ describe('dice state', () => {
     };
     const next = applyCard(createInitialState(1), card, new SequenceRng([0]));
 
-    expect(next.dice.thrusters.faces).toEqual([2, 1, 1, 1, 1, 0]);
+    expect(next.dice.thrusters.faces).toEqual([5, 4, 3, 3, 2, 0]);
   });
 
   it('adds a face value to multiple predetermined stats', () => {
@@ -47,10 +47,10 @@ describe('dice state', () => {
     };
     const next = applyCard(createInitialState(1), card);
 
-    expect(next.dice.thrusters.faces).toEqual([2, 1, 1, 0, 0, 1]);
-    expect(next.dice.fuel.faces).toEqual([2, 1, 1, 0, 0, 1]);
-    expect(next.dice.aerodynamics.faces).toEqual([2, 1, 1, 0, 0, 0]);
-    expect(next.dice.guidance.faces).toEqual([2, 1, 1, 0, 0, 1]);
+    expect(next.dice.thrusters.faces).toEqual([5, 4, 3, 2, 1, 1]);
+    expect(next.dice.fuel.faces).toEqual([5, 4, 3, 2, 1, 1]);
+    expect(next.dice.aerodynamics.faces).toEqual([5, 4, 3, 2, 1, 0]);
+    expect(next.dice.guidance.faces).toEqual([5, 4, 3, 2, 1, 1]);
   });
 
   it('keeps roll modifier cards out of dice face state', () => {

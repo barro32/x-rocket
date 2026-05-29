@@ -1,6 +1,7 @@
 import type { DiceCategory } from './types';
 
 export const diceCategories: DiceCategory[] = ['thrusters', 'fuel', 'aerodynamics', 'guidance', 'weight'];
+export const startingDiceCategories: DiceCategory[] = ['thrusters', 'fuel'];
 
 export const categoryLabels: Record<DiceCategory, string> = {
   thrusters: 'Thrusters',
@@ -20,4 +21,14 @@ export const categoryColors: Record<DiceCategory, string> = {
 
 export function categoryLabel(category: DiceCategory): string {
   return categoryLabels[category];
+}
+
+export function activeDiceCategoriesFor(boughtMetaNodes: string[]): DiceCategory[] {
+  return diceCategories.filter((category) => (
+    startingDiceCategories.includes(category) || boughtMetaNodes.includes(unlockDiceNodeId(category))
+  ));
+}
+
+export function unlockDiceNodeId(category: DiceCategory): string {
+  return `unlock-dice-${category}`;
 }

@@ -56,4 +56,19 @@ describe('save persistence', () => {
     expect(parsed.runCards[0].effect).toMatchObject({ type: 'multiplyStat', category: 'thrusters', multiplier: 2 });
     expect(parsed.pendingCardChoices[0].effect).toMatchObject({ type: 'multiplyStat', category: 'fuel', multiplier: 2 });
   });
+
+  it('migrates legacy first-ring stat nodes into dice unlock nodes', () => {
+    const state = createInitialState(123);
+    const parsed = parseSave(JSON.stringify({
+      ...state,
+      boughtMetaNodes: ['startingCapital', 'aerodynamics-0', 'guidance-0', 'weight-0'],
+    }));
+
+    expect(parsed.boughtMetaNodes).toEqual([
+      'startingCapital',
+      'unlock-dice-aerodynamics',
+      'unlock-dice-guidance',
+      'unlock-dice-weight',
+    ]);
+  });
 });

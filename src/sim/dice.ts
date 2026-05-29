@@ -1,11 +1,12 @@
-import { diceCategories } from './categories';
+import { activeDiceCategoriesFor, diceCategories } from './categories';
 import { metaNodeById } from './meta';
 import type { Rng } from './rng';
 import type { CardSpec, CategoryDie, DiceCategory, GameState, MetaNodeId } from './types';
 
-export const startingFaces = [2, 1, 1, 0, 0, 0];
+export const startingFaces = [5, 4, 3, 2, 1, 0];
 
 export function startingDice(boughtMetaNodes: MetaNodeId[]): Record<DiceCategory, CategoryDie> {
+  const activeCategories = activeDiceCategoriesFor(boughtMetaNodes);
   const dice = Object.fromEntries(diceCategories.map((category) => [
     category,
     { id: category, category, faces: [...startingFaces] },
@@ -21,7 +22,7 @@ export function startingDice(boughtMetaNodes: MetaNodeId[]): Record<DiceCategory
       const die = dice[node.effect.category];
       die.faces[node.effect.faceIndex] = (die.faces[node.effect.faceIndex] ?? 0) + node.effect.amount;
     } else if (node.effect.type === 'addWeakestFace') {
-      const category = weakestCategory(dice);
+      const category = weakestCategory(dice, activeCategories);
       addToFirstZeroFace(dice[category], node.effect.amount);
     }
   }
@@ -74,10 +75,11 @@ function addToFirstZeroFace(die: CategoryDie, amount = 1): void {
   die.faces[index === -1 ? 0 : index] += amount;
 }
 
-function weakestCategory(dice: Record<DiceCategory, CategoryDie>): DiceCategory {
-  return diceCategories.reduce((weakest, category) => (
+function weakestCategory(dice: Record<DiceCategory, CategoryDie>, categories: DiceCategory[]): DiceCategory {
+  const eligibleCategories = categories.length > 0 ? categories : diceCategories;
+  return eligibleCategories.reduce((weakest, category) => (
     dieTotal(dice[category]) < dieTotal(dice[weakest]) ? category : weakest
-  ), diceCategories[0]);
+  ), eligibleCategories[0]);
 }
 
 function dieTotal(die: CategoryDie): number {

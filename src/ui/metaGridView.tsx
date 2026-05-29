@@ -8,20 +8,16 @@ export type ViewBox = { x: number; y: number; width: number; height: number };
 interface MetaGridProps {
   state: GameState;
   viewBox?: ViewBox;
-  suppressClickUntil: number;
   onBuyNode: (id: MetaNodeId) => void;
   onHoverNode: (id: MetaNodeId) => void;
-  onSuppressClickUntil: (time: number) => void;
   onViewBoxChange: (viewBox: ViewBox) => void;
 }
 
 export function MetaGrid({
   state,
   viewBox,
-  suppressClickUntil,
   onBuyNode,
   onHoverNode,
-  onSuppressClickUntil,
   onViewBoxChange,
 }: MetaGridProps): ReactNode {
   const metrics = useMemo(metaGridMetrics, []);
@@ -97,10 +93,6 @@ export function MetaGrid({
       return;
     }
 
-    if (start.moved) {
-      onSuppressClickUntil(performance.now() + 250);
-    }
-
     dragStart.current = undefined;
     event.currentTarget.classList.remove('panning');
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -127,6 +119,23 @@ export function MetaGrid({
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
       >
+        <defs>
+          <radialGradient id="hex-led-face" cx="35%" cy="28%" r="70%">
+            <stop offset="0%" stopColor="color-mix(in srgb, var(--stat-color) 92%, #ffffff)" />
+            <stop offset="42%" stopColor="color-mix(in srgb, var(--stat-color) 72%, #243246)" />
+            <stop offset="100%" stopColor="color-mix(in srgb, var(--stat-color) 38%, #050914)" />
+          </radialGradient>
+          <radialGradient id="hex-led-pressed" cx="44%" cy="48%" r="74%">
+            <stop offset="0%" stopColor="color-mix(in srgb, var(--stat-color) 64%, #ffffff)" />
+            <stop offset="48%" stopColor="color-mix(in srgb, var(--stat-color) 52%, #172033)" />
+            <stop offset="100%" stopColor="color-mix(in srgb, var(--stat-color) 28%, #03050b)" />
+          </radialGradient>
+          <radialGradient id="hex-led-locked" cx="36%" cy="28%" r="72%">
+            <stop offset="0%" stopColor="#3a4558" />
+            <stop offset="58%" stopColor="#151d2d" />
+            <stop offset="100%" stopColor="#070b13" />
+          </radialGradient>
+        </defs>
         {metrics.positionedNodes.map(({ node, x, y }) => {
           const bought = state.boughtMetaNodes.includes(node.id);
           const unlocked = isMetaNodeUnlocked(state, node.id);
@@ -135,45 +144,74 @@ export function MetaGrid({
           const category = categoryForMetaEffect(node.effect);
           return (
             <g
-              className={[
-                'hex-node',
-                'cursor-not-allowed outline-none',
-                category ? 'stat-themed' : '',
-                bought ? 'bought' : '',
-                unlocked ? '' : 'locked',
-                buyable ? 'buyable cursor-pointer' : '',
-                temporary ? 'temporary' : '',
-              ].filter(Boolean).join(' ')}
+              className="hex-node"
               key={node.id}
-              style={category ? ({ '--stat-color': categoryColors[category] } as React.CSSProperties) : undefined}
+              style={{ '--stat-color': category ? categoryColors[category] : '#ffc857' } as React.CSSProperties}
               transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}
-              tabIndex={buyable ? 0 : -1}
-              role="button"
-              aria-disabled={buyable ? 'false' : 'true'}
-              onMouseEnter={() => onHoverNode(node.id)}
-              onFocus={() => onHoverNode(node.id)}
-              onClick={() => {
-                if (performance.now() >= suppressClickUntil) {
-                  onBuyNode(node.id);
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  if (performance.now() >= suppressClickUntil) {
+            >
+              <polygon className="pointer-events-none fill-[#101827] stroke-[#27344a] stroke-[1.2]" points={metrics.points} />
+              <circle
+                className={[
+                  'hex-led-well',
+                  bought ? 'bought' : '',
+                  buyable ? 'buyable' : '',
+                  unlocked ? '' : 'locked',
+                ].filter(Boolean).join(' ')}
+                r="21"
+              />
+              <circle
+                className={[
+                  'hex-led-button',
+                  bought ? 'bought' : '',
+                  buyable ? 'buyable' : '',
+                  unlocked ? '' : 'locked',
+                  temporary ? 'temporary' : '',
+                ].filter(Boolean).join(' ')}
+                r="17"
+                tabIndex={buyable ? 0 : -1}
+                role="button"
+                aria-disabled={buyable ? 'false' : 'true'}
+                aria-label={metaButtonLabel(node.effect)}
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerMove={(event) => event.stopPropagation()}
+                onPointerUp={(event) => event.stopPropagation()}
+                onPointerCancel={(event) => event.stopPropagation()}
+                onMouseEnter={() => onHoverNode(node.id)}
+                onFocus={() => onHoverNode(node.id)}
+                onClick={() => onBuyNode(node.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
                     onBuyNode(node.id);
                   }
-                }
-              }}
-            >
-              <polygon className="fill-[#152236] stroke-[#70839f] stroke-[1.5]" points={metrics.points} />
-              <text className="pointer-events-none fill-rocket-text text-[9px] font-bold [dominant-baseline:middle] [text-anchor:middle]">{compactMetaLabel(node.effect)}</text>
+                }}
+              />
+              <circle className="hex-led-highlight" r="7" cx="-5" cy="-6" />
             </g>
           );
         })}
       </svg>
     </div>
   );
+}
+
+function metaButtonLabel(effect: MetaNodeEffect): string {
+  switch (effect.type) {
+    case 'startingMoney':
+      return 'Better starting money';
+    case 'unlockDice':
+      return `Unlock ${categoryLabels[effect.category]}`;
+    case 'addFaceValue':
+      return `Add ${effect.amount} to ${categoryLabels[effect.category]}`;
+    case 'addWeakestFace':
+      return `Add ${effect.amount} to weakest side`;
+    case 'autoRerollLowest':
+      return 'Add lowest roll reroll';
+    case 'upgradeRandomFaceCard':
+      return `Improve ${categoryLabels[effect.category]} cards`;
+    case 'unlockCard':
+      return 'Unlock card';
+  }
 }
 
 function metaGridMetrics() {
@@ -208,26 +246,10 @@ function viewBoxValue(viewBox: ViewBox): string {
   return `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
 }
 
-function compactMetaLabel(effect: MetaNodeEffect): string {
-  switch (effect.type) {
-    case 'startingMoney':
-      return '+$5 Start';
-    case 'addFaceValue':
-      return `+${effect.amount} ${categoryLabels[effect.category]}`;
-    case 'addWeakestFace':
-      return `+${effect.amount} Weakest`;
-    case 'autoRerollLowest':
-      return 'Reroll Low';
-    case 'upgradeRandomFaceCard':
-      return `Better ${categoryLabels[effect.category]}`;
-    case 'unlockCard':
-      return 'Unlock Card';
-  }
-}
-
 function categoryForMetaEffect(effect: MetaNodeEffect): DiceCategory | undefined {
   switch (effect.type) {
     case 'addFaceValue':
+    case 'unlockDice':
     case 'upgradeRandomFaceCard':
       return effect.category;
     case 'unlockCard':

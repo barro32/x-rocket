@@ -1,5 +1,5 @@
 import { createInitialState } from './game';
-import { diceCategories } from './categories';
+import { diceCategories, unlockDiceNodeId } from './categories';
 import type { CardSpec, DiceCategory, GameState, LaunchResult } from './types';
 
 const saveKey = 'x-rocket-save-v3';
@@ -43,6 +43,7 @@ export function clearSave(storage: Storage = window.localStorage): void {
 
 function normalizeSave(parsed: GameState): GameState {
   const fallback = createInitialState(parsed.seed);
+  const boughtMetaNodes = normalizeBoughtMetaNodes(parsed.boughtMetaNodes);
   const dice = { ...fallback.dice, ...parsed.dice };
   for (const category of diceCategories) {
     const savedDie = dice[category];
@@ -57,7 +58,7 @@ function normalizeSave(parsed: GameState): GameState {
     ...fallback,
     ...parsed,
     dice,
-    boughtMetaNodes: parsed.boughtMetaNodes ?? [],
+    boughtMetaNodes,
     runCards: normalizeCards(parsed.runCards),
     autoRerollLowest: parsed.autoRerollLowest ?? 0,
     temporaryAutoRerollLowest: parsed.temporaryAutoRerollLowest ?? fallback.temporaryAutoRerollLowest,
@@ -67,6 +68,27 @@ function normalizeSave(parsed: GameState): GameState {
     pendingCardChoices: normalizeCards(parsed.pendingCardChoices),
     lastLaunch: normalizeLaunchResult(parsed.lastLaunch),
   };
+}
+
+function normalizeBoughtMetaNodes(nodeIds: string[] | undefined): string[] {
+  const normalized = new Set<string>();
+  for (const nodeId of nodeIds ?? []) {
+    switch (nodeId) {
+      case 'aerodynamics-0':
+        normalized.add(unlockDiceNodeId('aerodynamics'));
+        break;
+      case 'guidance-0':
+        normalized.add(unlockDiceNodeId('guidance'));
+        break;
+      case 'weight-0':
+        normalized.add(unlockDiceNodeId('weight'));
+        break;
+      default:
+        normalized.add(nodeId);
+        break;
+    }
+  }
+  return [...normalized];
 }
 
 function normalizeCards(cards: SavedCardSpec[] | undefined): CardSpec[] {

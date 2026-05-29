@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buyMetaNode, canBuyMetaNode, metaNodes, positionedMetaNodes } from '../src/sim/meta';
-import { diceCategories } from '../src/sim/categories';
+import { activeDiceCategoriesFor, diceCategories } from '../src/sim/categories';
 import { startingDice } from '../src/sim/dice';
 import { createInitialState, restartRun, startingMoneyFor } from '../src/sim/game';
 
@@ -30,6 +30,15 @@ describe('meta progression', () => {
   it('adds the requested meta expansion nodes', () => {
     const nodesById = Object.fromEntries(metaNodes.map((node) => [node.id, node]));
 
+    expect(nodesById['unlock-dice-aerodynamics']).toMatchObject({
+      effect: { type: 'unlockDice', category: 'aerodynamics' },
+    });
+    expect(nodesById['unlock-dice-guidance']).toMatchObject({
+      effect: { type: 'unlockDice', category: 'guidance' },
+    });
+    expect(nodesById['unlock-dice-weight']).toMatchObject({
+      effect: { type: 'unlockDice', category: 'weight' },
+    });
     expect(nodesById['unlock-double-highest']).toBeDefined();
     expect(nodesById['unlock-top-bottom']).toBeDefined();
     expect(nodesById['unlock-plus3-minus1-thrusters']).toBeDefined();
@@ -54,14 +63,32 @@ describe('meta progression', () => {
     expect(nodesById['weight-4']).toBeDefined();
   });
 
-  it('has enough face upgrades for every stat to reach 543210', () => {
+  it('starts with two dice and unlocks extra dice from meta nodes', () => {
+    expect(activeDiceCategoriesFor([])).toEqual(['thrusters', 'fuel']);
+    expect(activeDiceCategoriesFor(['unlock-dice-aerodynamics', 'unlock-dice-weight'])).toEqual([
+      'thrusters',
+      'fuel',
+      'aerodynamics',
+      'weight',
+    ]);
+  });
+
+  it('starts every stat at 543210', () => {
+    const dice = startingDice([]);
+
+    for (const category of diceCategories) {
+      expect(dice[category].faces).toEqual([5, 4, 3, 2, 1, 0]);
+    }
+  });
+
+  it('applies every face upgrade above the starting dice values', () => {
     for (const category of diceCategories) {
       const nodeIds = metaNodes
         .filter((node) => node.effect.type === 'addFaceValue' && node.effect.category === category)
         .map((node) => node.id);
       const dice = startingDice(nodeIds);
 
-      expect(dice[category].faces).toEqual([5, 4, 3, 2, 1, 0]);
+      expect(dice[category].faces).toEqual([8, 7, 5, 4, 2, 0]);
     }
   });
 
@@ -77,5 +104,19 @@ describe('meta progression', () => {
 
     expect(coords.size).toBe(metaNodes.length);
     expect(ids.size).toBe(metaNodes.length);
+  });
+
+  it('organizes meta nodes into complete rings before starting the next ring', () => {
+    const ringCounts = new Map<number, number>();
+    for (const node of positionedMetaNodes) {
+      const radius = Math.max(Math.abs(node.x), Math.abs(node.y), Math.abs(node.z));
+      ringCounts.set(radius, (ringCounts.get(radius) ?? 0) + 1);
+    }
+
+    expect(ringCounts.get(0)).toBe(1);
+    expect(ringCounts.get(1)).toBe(6);
+    expect(ringCounts.get(2)).toBe(12);
+    expect(ringCounts.get(3)).toBe(18);
+    expect(ringCounts.get(4)).toBe(24);
   });
 });

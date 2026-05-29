@@ -1,4 +1,5 @@
 import { draftCards } from './cards';
+import { activeDiceCategoriesFor } from './categories';
 import { applyCard, startingDice } from './dice';
 import { metaNodeById } from './meta';
 import { rollDice } from './roll';
@@ -8,7 +9,7 @@ import type { GameState, LaunchResult, MetaNodeId } from './types';
 export const launchCost = 1;
 export const baseStartingMoney = 5;
 export const doubledStartingMoney = 10;
-export const milestones = [5, 10, 25, 50, 100];
+export const milestones = [2, 5, 10, 25, 50, 100];
 export { applyCard, startingDice };
 
 export function createInitialState(seed = Date.now()): GameState {
@@ -75,7 +76,8 @@ export function simulateLaunch(state: GameState, rng: Rng = new Mulberry32(state
     return state;
   }
 
-  const roll = rollDice(state.dice, rng, state.autoRerollLowest + state.temporaryAutoRerollLowest, state.runCards);
+  const activeCategories = activeDiceCategoriesFor(state.boughtMetaNodes);
+  const roll = rollDice(state.dice, rng, state.autoRerollLowest + state.temporaryAutoRerollLowest, state.runCards, activeCategories);
   const heightMeters = roll.exploded ? 0 : roll.score;
   const reachedRunMilestones = milestones.filter((milestone) => heightMeters >= milestone && !state.runMilestoneClaims.includes(milestone));
   const reachedAllTimeMilestones: number[] = [];

@@ -7,9 +7,10 @@ export function rollDice(
   rng: Rng,
   autoRerollLowest: number,
   runCards: CardSpec[],
+  categories: DiceCategory[] = diceCategories,
 ): LaunchRoll {
   const events: RollEvent[] = [];
-  const rolls: DieRoll[] = diceCategories.map((category) => {
+  const rolls: DieRoll[] = categories.map((category) => {
     const die = dice[category];
     const rolledFace = pickFace(die.faces, rng);
     events.push({ type: 'initialRoll', category, value: rolledFace.value, faceIndex: rolledFace.faceIndex });

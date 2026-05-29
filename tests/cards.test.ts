@@ -31,12 +31,15 @@ describe('card drafting', () => {
   });
 
   it('drafts rare S6 unlocks with three predetermined stats', () => {
-    const cards = draftCards(new SequenceRng([0.97, 0.1, 0, 0, 0.3, 0.6]), 1, ['unlock-s6-three-stats']);
+    const cards = draftCards(new SequenceRng([0.97, 0.1, 0, 0, 0.4, 0.8]), 1, [
+      'unlock-dice-aerodynamics',
+      'unlock-s6-three-stats',
+    ]);
 
     expect(cards[0]).toMatchObject({
       name: '+1 S6 x3',
-      description: '+1 side 6: Thrusters, Fuel, Guidance',
-      effect: { type: 'addFaceValueToCategories', categories: ['thrusters', 'fuel', 'guidance'], faceIndex: 5, amount: 1 },
+      description: '+1 side 6: Thrusters, Fuel, Aero',
+      effect: { type: 'addFaceValueToCategories', categories: ['thrusters', 'fuel', 'aerodynamics'], faceIndex: 5, amount: 1 },
     });
   });
 
@@ -61,7 +64,10 @@ describe('card drafting', () => {
   });
 
   it('drafts uncommon S5 triple stat cards', () => {
-    const cards = draftCards(new SequenceRng([0.8, 0, 0.1, 0]), 1);
+    const cards = draftCards(new SequenceRng([0.8, 0.1, 0]), 1, [
+      'unlock-dice-aerodynamics',
+      'unlock-dice-weight',
+    ]);
 
     expect(cards[0]).toMatchObject({
       id: 'uncommon-s5-thrusters-aerodynamics-weight',
@@ -81,12 +87,14 @@ describe('card drafting', () => {
     const cards = draftCards(new SequenceRng(Array(200).fill(0.1)), 8);
 
     expect(cards.map((card) => card.effect.type === 'addRandomFaceValue' ? card.effect.category : ''))
-      .toEqual(['thrusters', 'fuel', 'aerodynamics', 'guidance', 'weight', 'thrusters', 'fuel', 'aerodynamics']);
+      .toEqual(['thrusters', 'fuel', 'thrusters', 'fuel', 'thrusters', 'fuel', 'thrusters', 'fuel']);
   });
 
   it('summarizes the currently unlocked card pool', () => {
     const cards = unlockedCardPoolFor([
       'upgrade-random-face-card-thrusters',
+      'unlock-dice-guidance',
+      'unlock-dice-weight',
       'unlock-double-highest',
       'unlock-s6-three-stats',
     ]);

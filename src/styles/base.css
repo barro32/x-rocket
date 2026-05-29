@@ -92,49 +92,104 @@
     @apply cursor-grabbing;
   }
 
-  .hex-node.stat-themed polygon {
-    fill: color-mix(in srgb, var(--stat-color) 17%, #152236);
-    stroke: color-mix(in srgb, var(--stat-color) 80%, #70839f);
+  .hex-led-well {
+    fill: #050914;
+    filter:
+      drop-shadow(0 2px 1px rgba(255, 255, 255, 0.07))
+      drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.82));
+    pointer-events: none;
+    stroke: #263348;
+    stroke-width: 1.4;
   }
 
-  .hex-node.stat-themed text {
-    fill: color-mix(in srgb, var(--stat-color) 58%, #ffffff);
+  .hex-led-well.buyable {
+    fill: #07101d;
+    filter:
+      drop-shadow(0 2px 1px rgba(255, 255, 255, 0.12))
+      drop-shadow(0 -3px 3px rgba(0, 0, 0, 0.88));
+    stroke: color-mix(in srgb, var(--stat-color) 38%, #263348);
+    stroke-width: 1.6;
   }
 
-  .hex-node.locked polygon {
-    fill: #101827;
-    stroke: #43506a;
+  .hex-led-well.bought {
+    fill: #02040a;
+    filter:
+      drop-shadow(0 -1px 1px rgba(255, 255, 255, 0.06))
+      drop-shadow(0 2px 3px rgba(0, 0, 0, 0.92));
+    stroke: color-mix(in srgb, var(--stat-color) 22%, #0b1019);
+    stroke-width: 2.6;
   }
 
-  .hex-node.stat-themed.locked polygon {
-    fill: color-mix(in srgb, var(--stat-color) 7%, #101827);
-    stroke: color-mix(in srgb, var(--stat-color) 28%, #43506a);
-  }
-
-  .hex-node.locked text {
-    fill: #77889f;
-  }
-
-  .hex-node.buyable polygon {
-    stroke: var(--stat-color, #ffc857);
+  .hex-led-button {
+    cursor: not-allowed;
+    fill: url(#hex-led-locked);
+    filter:
+      drop-shadow(0 1px 0 rgba(255, 255, 255, 0.08))
+      drop-shadow(0 3px 3px rgba(0, 0, 0, 0.65));
+    opacity: 0.48;
+    pointer-events: auto;
+    stroke: #334057;
     stroke-width: 2;
+    transform-box: fill-box;
+    transform-origin: center;
   }
 
-  .hex-node.bought polygon {
-    fill: color-mix(in srgb, var(--stat-color, #8ef6c5) 20%, #123226);
-    stroke: var(--stat-color, #8ef6c5);
+  .hex-led-button.buyable {
+    cursor: pointer;
+    fill: url(#hex-led-face);
+    filter:
+      drop-shadow(0 -1px 0 color-mix(in srgb, var(--stat-color) 52%, #ffffff))
+      drop-shadow(0 0 13px color-mix(in srgb, var(--stat-color) 58%, transparent))
+      drop-shadow(0 6px 0 rgba(0, 0, 0, 0.58))
+      drop-shadow(0 11px 9px rgba(0, 0, 0, 0.5));
+    opacity: 1;
+    stroke: color-mix(in srgb, var(--stat-color) 78%, #ffffff);
+    stroke-width: 2;
+    transform: translateY(-2px) scale(1.04);
   }
 
-  .hex-node.temporary polygon {
+  .hex-led-button.bought {
+    cursor: default;
+    fill: url(#hex-led-pressed);
+    filter:
+      drop-shadow(0 0 8px color-mix(in srgb, var(--stat-color) 42%, transparent))
+      drop-shadow(0 -2px 1px rgba(0, 0, 0, 0.72))
+      drop-shadow(0 1px 1px rgba(255, 255, 255, 0.08));
+    opacity: 1;
+    stroke: color-mix(in srgb, var(--stat-color) 46%, #101827);
+    stroke-width: 3;
+    transform: translateY(4px) scale(0.82);
+  }
+
+  .hex-led-button.temporary {
     stroke-dasharray: 5 3;
   }
 
-  .hex-node.bought text {
-    fill: color-mix(in srgb, var(--stat-color, #8ef6c5) 70%, #ffffff);
+  .hex-led-button:focus {
+    outline: none;
+    stroke: #ffffff;
+    stroke-width: 2.8;
   }
 
-  .hex-node:focus polygon {
-    stroke: #ffffff;
-    stroke-width: 2.5;
+  .hex-led-highlight {
+    fill: rgba(255, 255, 255, 0.42);
+    filter: blur(1px);
+    pointer-events: none;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .hex-led-button.locked ~ .hex-led-highlight {
+    opacity: 0.12;
+  }
+
+  .hex-led-button.buyable ~ .hex-led-highlight {
+    opacity: 0.86;
+    transform: translateY(-3px) scale(1.08);
+  }
+
+  .hex-led-button.bought ~ .hex-led-highlight {
+    opacity: 0.24;
+    transform: translate(3px, 3px) scale(0.56);
   }
 }
